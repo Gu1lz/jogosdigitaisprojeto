@@ -1,0 +1,198 @@
+
+name: Criar Kanban HeadRush
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  create:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependências
+        run: pip install requests pyyaml
+
+      - name: Popular quadro se estiver vazio
+        env:
+          GH_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+          PROJECT_OWNER: Gu1lz
+          PROJECT_NUMBER: "5"
+        run: |
+          python - <<'PY'
+          import os
+          import requests
+          import yaml
+
+          token = os.environ["GH_TOKEN"]
+          owner = os.environ["PROJECT_OWNER"]
+          number = int(os.environ["PROJECT_NUMBER"])
+          endpoint = "https://api.github.com/graphql"
+
+          def graphql(query, variables=None):
+              r = requests.post(
+                  endpoint,
+                  headers={"Authorization": f"Bearer {token}"},
+                  json={"query": query, "variables": variables or {}},
+                  timeout=30,
+              )
+              r.raise_for_status()
+              result = r.json()
+              if result.get("errors"):
+                  raise RuntimeError(result["errors"])
+              return result["data"]
+
+          project = graphql("""
+            query($owner: String!, $number: Int!) {
+              user(login: $owner) {
+                projectV2(number: $number) {
+                  id
+                  items(first: 1) {
+                    totalCount
+                  }
+                  fields(first: 50) {
+                    nodes {
+                      __typename
+                      ... on ProjectV2Field { id name }
+                      ... on ProjectV2SingleSelectField {
+                        id name options { id name }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          """, {"owner": owner, "number": number})["user"]["projectV2"]
+
+          if not project:
+              raise RuntimeError("Projeto não encontrado.")
+
+          if project["items"]["totalCount"] > 0:
+              print("O Kanban já contém cartões. Nenhuma tarefa foi criada.")
+              raise SystemExit(0)
+
+          with open(".github/kanban-status.yml", encoding="utf-8") as f:
+              config = yaml.safe_load(f)
+
+          fields = {
+              field["name"].strip().lower(): field
+              for field in project["fields"]["nodes"]
+          }
+
+          def set_date(item_id, field_name, date):
+              field = fields.get(field_name)
+              if not field or not date:
+                  return
+              graphql("""
+                mutation($project: ID!, $item: ID!, $field: ID!, $date: Date!) {
+                  updateProjectV2ItemFieldDateValue(input: {
+                    projectId: $project,
+                    itemId: $item,
+                    fieldId: $field,
+                    date: $date
+                  }) {
+                    projectV2Item { id }
+                  }
+                }
+              """, {
+                  "project": project["id"],
+                  "item": item_id,
+                  "field": field["id"],
+                  "date": str(date),
+              })
+
+          def set_status(item_id, status_id):
+              field = fields.get("status")
+              if not field:
+                  return
+              statuses = {
+                  str(s["id"]): str(s["name"])
+                  for s in config.get("statuses", [])
+              }
+              desired = statuses.get(str(status_id), str(status_id)).lower()
+              aliases = {
+                  "fila": ["backlog"],
+                  "a_fazer": ["to do", "todo", "a fazer"],
+                  "em_andamento": ["in progress", "doing", "em andamento"],
+                  "em_revisao": ["in review", "review", "em revisão"],
+                  "concluido": ["done", "complete", "completed", "concluído"],
+              }
+              candidates = [desired] + aliases.get(str(status_id), [])
+              option = next(
+                  (o for o in field.get("options", [])
+                   if o["name"].strip().lower() in candidates),
+                  None,
+              )
+              if not option:
+                  print(f"Status '{status_id}' sem opção correspondente no Project.")
+                  return
+              graphql("""
+                mutation($project: ID!, $item: ID!, $field: ID!, $option: String!) {
+                  updateProjectV2ItemFieldSingleSelectValue(input: {
+                    projectId: $project,
+                    itemId: $item,
+                    fieldId: $field,
+                    singleSelectOptionId: $option
+                  }) {
+                    projectV2Item { id }
+                  }
+                }
+              """, {
+                  "project": project["id"],
+                  "item": item_id,
+                  "field": field["id"],
+                  "option": option["id"],
+              })
+
+          tasks = config.get("tasks", [])
+          if not tasks:
+              print("O YAML não contém tarefas.")
+              raise SystemExit(0)
+
+          for task in tasks:
+              title = str(task["title"])
+              start = task.get("start_date") or task.get("date") or ""
+              due = task.get("due_date") or task.get("date") or ""
+              status = str(task.get("status", "a_fazer"))
+              notes = str(task.get("notes", ""))
+
+              body = (
+                  f"Início: {start}\n"
+                  f"Prazo: {due}\n"
+                  f"Status planejado: {status}\n\n"
+                  f"{notes}"
+              )
+
+              created = graphql("""
+                mutation($project: ID!, $title: String!, $body: String!) {
+                  addProjectV2DraftIssue(input: {
+                    projectId: $project,
+                    title: $title,
+                    body: $body
+                  }) {
+                    projectItem { id }
+                  }
+                }
+              """, {
+                  "project": project["id"],
+                  "title": title,
+                  "body": body,
+              })["addProjectV2DraftIssue"]["projectItem"]
+
+              set_status(created["id"], status)
+              set_date(created["id"], "start date", start)
+              set_date(created["id"], "target date", due)
+              print(f"Cartão criado: {title}")
+
+          print(f"Criação concluída: {len(tasks)} cartões processados.")
+          PY
