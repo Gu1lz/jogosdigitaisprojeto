@@ -1,0 +1,114 @@
+
+# Configuração do Kanban — jogosdigitaisprojeto
+# Período: 2026-10-20 a 2026-11-01
+# Desenvolvimento iniciado em: 2026-10-22
+# Este arquivo documenta tarefas e status; sozinho, não cria cartões no GitHub Projects.
+# A sincronização automática exige um workflow ou script com permissões adequadas.
+
+project:
+  name: "HeadRush"
+  start_date: "2026-10-20"
+  development_start_date: "2026-10-22"
+  due_date: "2026-11-01"
+  framework: "Java + libGDX"
+  concept: "Jogo inspirado em Geometry Dash controlado por movimentos da cabeça via dispositivo IoT"
+
+statuses:
+  - id: fila
+    name: "Backlog"
+  - id: a_fazer
+    name: "A fazer"
+  - id: em_andamento
+    name: "Em andamento"
+  - id: em_revisao
+    name: "Em revisão"
+  - id: concluido
+    name: "Concluído"
+
+tasks:
+  - id: definicao_projeto
+    title: "Definir proposta do jogo e público-alvo"
+    date: "2026-10-20"
+    status: concluido
+    notes: "Definição inicial do jogo inspirado em Geometry Dash e do controle por movimentos da cabeça."
+
+  - id: escolha_dispositivo_iot
+    title: "Definir acelerômetro como dispositivo IoT pretendido"
+    date: "2026-10-20"
+    status: concluido
+    notes: "O hardware ainda precisa ser adquirido ou confirmado."
+
+  - id: pesquisa_viabilidade
+    title: "Pesquisar a viabilidade do controle por movimentos da cabeça"
+    date: "2026-10-21"
+    status: em_revisao
+    notes: "Registrar as fontes consultadas na documentação do projeto."
+
+  - id: primeiro_codigo_menu
+    title: "Adicionar o primeiro código do menu ao repositório"
+    date: "2026-10-22"
+    status: concluido
+    notes: "Primeiro código do menu registrado no repositório. O desenvolvimento começou nesta quinta-feira."
+
+  - id: planejamento_readme
+    title: "Organizar README e requisitos do projeto"
+    start_date: "2026-10-23"
+    due_date: "2026-10-24"
+    status: a_fazer
+
+  - id: tela_jogabilidade
+    title: "Criar tela de gameplay, personagem e cenário básico"
+    start_date: "2026-10-25"
+    due_date: "2026-10-25"
+    status: a_fazer
+
+  - id: mecanicas_principais
+    title: "Implementar movimento, pulo, obstáculos, colisões, reinício e primeira fase"
+    start_date: "2026-10-26"
+    due_date: "2026-10-26"
+    status: a_fazer
+
+  - id: seis_fases
+    title: "Implementar seis fases com dificuldade progressiva"
+    start_date: "2026-10-27"
+    due_date: "2026-10-26"
+    status: a_fazer
+
+  - id: controles_metricas
+    title: "Criar entrada simulada e registrar métricas de desempenho"
+    start_date: "2026-10-28"
+    due_date: "2026-10-28"
+    status: a_fazer
+
+  - id: integracao_acelerometro
+    title: "Integrar acelerômetro ao controle do personagem"
+    start_date: "2026-10-29"
+    due_date: "2026-10-29"
+    status: a_fazer
+    notes: "Depende da disponibilidade do hardware. Se indisponível, documentar a simulação e a integração pendente."
+
+  - id: testes_correcao_bugs
+    title: "Testar fases, controles e menu; corrigir bugs"
+    start_date: "2026-10-30"
+    due_date: "2026-10-30"
+    status: a_fazer
+
+  - id: documentacao_executavel
+    title: "Finalizar README, short paper e executável"
+    start_date: "2026-10-31"
+    due_date: "2026-10-31"
+    status: a_fazer
+
+  - id: revisao_entrega
+    title: "Revisar e entregar o projeto"
+    start_date: "2026-11-01"
+    due_date: "2026-11-01"
+    status: a_fazer
+
+deliverables:
+  - "Código-fonte completo"
+  - "Executável ou APK"
+  - "Short paper de até seis páginas"
+  - "README atualizado"
+  - "Commits semanais no GitHub"
+  - "Quadro Kanban atualizado"
