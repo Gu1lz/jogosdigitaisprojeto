@@ -1,5 +1,5 @@
 
-name: Criar Kanban HeadRush
+name: Recriar Kanban HeadRush (Não usar se estiver criado!)
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ permissions:
   contents: read
 
 jobs:
-  create:
+  recreate:
     runs-on: ubuntu-latest
 
     steps:
@@ -23,7 +23,7 @@ jobs:
       - name: Instalar dependências
         run: pip install requests pyyaml
 
-      - name: Popular quadro se estiver vazio
+      - name: Sobrescrever Kanban com o YAML
         env:
           GH_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
           PROJECT_OWNER: Gu1lz
@@ -33,6 +33,7 @@ jobs:
           import os
           import requests
           import yaml
+          import unicodedata
 
           token = os.environ["GH_TOKEN"]
           owner = os.environ["PROJECT_OWNER"]
@@ -40,25 +41,56 @@ jobs:
           endpoint = "https://api.github.com/graphql"
 
           def graphql(query, variables=None):
-              r = requests.post(
+              response = requests.post(
                   endpoint,
-                  headers={"Authorization": f"Bearer {token}"},
-                  json={"query": query, "variables": variables or {}},
-                  timeout=30,
+                  headers={
+                      "Authorization": f"Bearer {token}",
+                      "Content-Type": "application/json",
+                  },
+                  json={
+                      "query": query,
+                      "variables": variables or {},
+                  },
+                  timeout=60,
               )
-              r.raise_for_status()
-              result = r.json()
+              response.raise_for_status()
+              result = response.json()
               if result.get("errors"):
                   raise RuntimeError(result["errors"])
               return result["data"]
+
+          def normalize(value):
+              value = unicodedata.normalize("NFKD", str(value or ""))
+              return "".join(
+                  char for char in value
+                  if not unicodedata.combining(char)
+              ).strip().lower()
+
+          with open(".github/kanban-status.yml", encoding="utf-8") as f:
+              config = yaml.safe_load(f)
+
+          tasks = config.get("tasks", [])
+          if not tasks:
+              raise RuntimeError("O YAML não contém tarefas. Abortando para evitar apagar o quadro.")
 
           project = graphql("""
             query($owner: String!, $number: Int!) {
               user(login: $owner) {
                 projectV2(number: $number) {
                   id
-                  items(first: 1) {
-                    totalCount
+                  items(first: 100) {
+                    nodes {
+                      id
+                      content {
+                        ... on DraftIssue { title }
+                        ... on Issue { title }
+                        ... on PullRequest { title }
+                      }
+                    }
+                    pageInfo {
+                      hasNextPage
+                      endCursor
+                    }
                   }
                   fields(first: 50) {
                     nodes {
@@ -75,67 +107,71 @@ jobs:
           """, {"owner": owner, "number": number})["user"]["projectV2"]
 
           if not project:
-              raise RuntimeError("Projeto não encontrado.")
+              raise RuntimeError("GitHub Project não encontrado.")
 
-          if project["items"]["totalCount"] > 0:
-              print("O Kanban já contém cartões. Nenhuma tarefa foi criada.")
-              raise SystemExit(0)
+          if project["items"]["pageInfo"]["hasNextPage"]:
+              raise RuntimeError(
+                  "O projeto tem mais de 100 itens. Nenhuma alteração foi feita; "
+                  "é necessário paginar os itens antes de recriar o quadro."
+              )
 
-          with open(".github/kanban-status.yml", encoding="utf-8") as f:
-              config = yaml.safe_load(f)
-
+          project_id = project["id"]
           fields = {
-              field["name"].strip().lower(): field
+              normalize(field["name"]): field
               for field in project["fields"]["nodes"]
           }
 
-          def set_date(item_id, field_name, date):
-              field = fields.get(field_name)
-              if not field or not date:
-                  return
+          # Remove todos os itens existentes do Project.
+          for item in project["items"]["nodes"]:
               graphql("""
-                mutation($project: ID!, $item: ID!, $field: ID!, $date: Date!) {
-                  updateProjectV2ItemFieldDateValue(input: {
+                mutation($project: ID!, $item: ID!) {
+                  deleteProjectV2Item(input: {
                     projectId: $project,
-                    itemId: $item,
-                    fieldId: $field,
-                    date: $date
+                    itemId: $item
                   }) {
-                    projectV2Item { id }
+                    deletedItemId
                   }
                 }
-              """, {
-                  "project": project["id"],
-                  "item": item_id,
-                  "field": field["id"],
-                  "date": str(date),
-              })
+              """, {"project": project_id, "item": item["id"]})
+              content = item.get("content") or {}
+              print(f"Item removido do Project: {content.get('title', item['id'])}")
+
+          statuses = {
+              str(status["id"]): str(status["name"])
+              for status in config.get("statuses", [])
+          }
 
           def set_status(item_id, status_id):
               field = fields.get("status")
               if not field:
+                  print("Aviso: campo Status não encontrado.")
                   return
-              statuses = {
-                  str(s["id"]): str(s["name"])
-                  for s in config.get("statuses", [])
-              }
-              desired = statuses.get(str(status_id), str(status_id)).lower()
+
               aliases = {
                   "fila": ["backlog"],
-                  "a_fazer": ["to do", "todo", "a fazer"],
-                  "em_andamento": ["in progress", "doing", "em andamento"],
-                  "em_revisao": ["in review", "review", "em revisão"],
-                  "concluido": ["done", "complete", "completed", "concluído"],
+                  "a_fazer": ["ready", "todo", "to do"],
+                  "em_andamento": ["in progress", "doing"],
+                  "em_revisao": ["in review", "review"],
+                  "concluido": ["done", "complete", "completed"],
               }
-              candidates = [desired] + aliases.get(str(status_id), [])
+
+              desired = normalize(statuses.get(status_id, status_id))
+              candidates = [desired] + aliases.get(status_id, [])
               option = next(
-                  (o for o in field.get("options", [])
-                   if o["name"].strip().lower() in candidates),
+                  (
+                      opt for opt in field.get("options", [])
+                      if normalize(opt["name"]) in candidates
+                  ),
                   None,
               )
+
               if not option:
-                  print(f"Status '{status_id}' sem opção correspondente no Project.")
+                  print(
+                      f"Aviso: status '{status_id}' não possui opção "
+                      "equivalente no Project."
+                  )
                   return
+
               graphql("""
                 mutation($project: ID!, $item: ID!, $field: ID!, $option: String!) {
                   updateProjectV2ItemFieldSingleSelectValue(input: {
@@ -148,16 +184,34 @@ jobs:
                   }
                 }
               """, {
-                  "project": project["id"],
+                  "project": project_id,
                   "item": item_id,
                   "field": field["id"],
                   "option": option["id"],
               })
 
-          tasks = config.get("tasks", [])
-          if not tasks:
-              print("O YAML não contém tarefas.")
-              raise SystemExit(0)
+          def set_date(item_id, field_name, date):
+              field = fields.get(normalize(field_name))
+              if not field or not date:
+                  return
+
+              graphql("""
+                mutation($project: ID!, $item: ID!, $field: ID!, $date: Date!) {
+                  updateProjectV2ItemFieldDateValue(input: {
+                    projectId: $project,
+                    itemId: $item,
+                    fieldId: $field,
+                    date: $date
+                  }) {
+                    projectV2Item { id }
+                  }
+                }
+              """, {
+                  "project": project_id,
+                  "item": item_id,
+                  "field": field["id"],
+                  "date": str(date),
+              })
 
           for task in tasks:
               title = str(task["title"])
@@ -184,15 +238,16 @@ jobs:
                   }
                 }
               """, {
-                  "project": project["id"],
+                  "project": project_id,
                   "title": title,
                   "body": body,
               })["addProjectV2DraftIssue"]["projectItem"]
 
-              set_status(created["id"], status)
-              set_date(created["id"], "start date", start)
-              set_date(created["id"], "target date", due)
+              item_id = created["id"]
+              set_status(item_id, status)
+              set_date(item_id, "start date", start)
+              set_date(item_id, "target date", due)
               print(f"Cartão criado: {title}")
 
-          print(f"Criação concluída: {len(tasks)} cartões processados.")
+          print(f"Kanban recriado com {len(tasks)} tarefas do YAML.")
           PY
