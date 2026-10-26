@@ -1,0 +1,1 @@
+./gradlew clean l lwjgl3:run

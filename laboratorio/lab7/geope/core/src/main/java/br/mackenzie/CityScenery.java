@@ -35,7 +35,7 @@ public class CityScenery {
 
         addBuildings(
             rnd, 0.9f, 2.4f, 2.5f, 6f,
-            0.12f, DARK, PURPLE, 0.45f
+            0.12f, BLOCK_BODY, PURPLE, 0.45f
         );
 
         addBuildings(
