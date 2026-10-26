@@ -1,6 +1,8 @@
 package br.mackenzie;
 
 import com.badlogic.gdx.Game;
+import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Preferences;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
@@ -13,16 +15,20 @@ public class Main extends Game {
     private ShapeRenderer shapes;
     private BitmapFont font;
     private float fontBaseLineHeight;
+    private Assets assets;
+    private Preferences prefs;
 
     @Override
     public void create() {
         batch = new SpriteBatch();
         shapes = new ShapeRenderer();
+        assets = new Assets();
+        prefs = Gdx.app.getPreferences("headdash");
 
         font = new BitmapFont();
         font.setUseIntegerPositions(false);
         font.getRegion().getTexture().setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
-        fontBaseLineHeight = font.getLineHeight(); // altura da linha com escala 1
+        fontBaseLineHeight = font.getLineHeight();
 
         setScreen(new MenuScreen(this));
     }
@@ -35,13 +41,20 @@ public class Main extends Game {
         return shapes;
     }
 
-    /**
-     * Desenha texto com tamanho dado em unidades do mundo (altura da linha).
-     * Deve ser chamado entre batch.begin() e batch.end().
-     *
-     * @param align constante de com.badlogic.gdx.utils.Align (Align.center, Align.left, ...)
-     * @param y     posição do TOPO do texto
-     */
+    public Assets getAssets() {
+        return assets;
+    }
+
+    public int getBestScore() {
+        return prefs.getInteger("best", 0);
+    }
+
+    public void setBestScore(int score) {
+        prefs.putInteger("best", score);
+        prefs.flush();
+    }
+
+    /** Texto com altura de linha em unidades de mundo; y = topo do texto. Usar entre batch.begin()/end(). */
     public void drawText(String text, float size, Color color, float alpha,
                          float x, float y, float width, int align) {
         font.getData().setScale(size / fontBaseLineHeight);
@@ -51,9 +64,10 @@ public class Main extends Game {
 
     @Override
     public void dispose() {
-        super.dispose(); 
+        super.dispose();
         batch.dispose();
         shapes.dispose();
         font.dispose();
+        assets.dispose();
     }
 }
