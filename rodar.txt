@@ -1,1 +1,1 @@
-./gradlew clean l lwjgl3:run
+./gradlew clean lwjgl3:run

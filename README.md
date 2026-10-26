@@ -2,6 +2,15 @@
 
 ## Jogo sério para reabilitação com libGDX
 
+### Alterações
+
+* **[Add]** Tela de Menu Principal com opções de navegação.
+* **[Add]** Tela de Gameplay estruturada para o loop do jogo.
+* **[Add]** Personagem jogável com controles de movimento.
+* **[Add]** Cenário e elementos visuais de ambientação.
+* **[Add]** Sistema de colisão para delimitar áreas e obstáculos.
+* **[Add]** Sistema de pontuação com exibição em tempo real na HUD.
+
 ### 1. Visão geral
 
 Desenvolvimento de um jogo digital inspirado em **Geometry Dash**, com foco em acessibilidade e apoio à reabilitação física. O projeto utilizará movimentos da cabeça como forma de interação, por meio de um dispositivo IoT capaz de coletar dados de movimento.
