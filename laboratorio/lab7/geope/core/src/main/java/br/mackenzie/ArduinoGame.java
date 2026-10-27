@@ -1,4 +1,4 @@
-package br.mackenzie.serial;
+package br.mackenzie;
 
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
