@@ -9,6 +9,10 @@ public final class Theme {
     public static final float WORLD_W = 9f;
     public static final float WORLD_H = 16f;
 
+    /** Nome unico do jogo (menu, preferencias). Mude so aqui. */
+    public static final String GAME_TITLE = "HEAD RUSH";
+    public static final String PREFS_NAME = "headrush";
+
     public static final Color VOID          = new Color(0.02f, 0.01f, 0.06f, 1f);
     public static final Color SKY_TOP       = new Color(0.05f, 0.02f, 0.14f, 1f);
     public static final Color SKY_BOTTOM    = new Color(0.22f, 0.04f, 0.28f, 1f);
