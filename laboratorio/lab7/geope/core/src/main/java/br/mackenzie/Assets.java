@@ -1,11 +1,13 @@
 package br.mackenzie;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.Disposable;
+import com.badlogic.gdx.utils.GdxRuntimeException;
 
 public final class Assets implements Disposable {
 
@@ -36,7 +38,12 @@ public final class Assets implements Disposable {
         Array<TextureRegion> frames = new Array<>();
         Texture.TextureFilter filter = PIXEL_ART ? Texture.TextureFilter.Nearest : Texture.TextureFilter.Linear;
         for (String path : paths) {
-            Texture t = new Texture(Gdx.files.internal(path));
+            FileHandle file = Gdx.files.internal(path);
+            if (!file.exists()) {
+                throw new GdxRuntimeException("Sprite nao encontrado: " + path
+                    + " (confira se a pasta assets/ foi commitada e se o working dir do lwjgl3 aponta para ela)");
+            }
+            Texture t = new Texture(file);
             t.setFilter(filter, filter);
             textures.add(t);
             frames.add(new TextureRegion(t));
