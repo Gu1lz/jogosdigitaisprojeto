@@ -39,6 +39,12 @@ public class GameScreen extends ScreenAdapter {
 
     private static final int MAX_PARTICLES = 220;
 
+    // botao de pausa (toque), no topo central
+    private static final float PAUSE_CX = W / 2f;
+    private static final float PAUSE_CY = H - 0.95f;
+    private static final float PAUSE_SIZE = 0.8f;
+    private static final float PAUSE_HIT = 0.7f; // meia-largura da area de toque
+
     private final Main game;
     private final SpriteBatch batch;
     private final ShapeRenderer shapes;
@@ -47,6 +53,10 @@ public class GameScreen extends ScreenAdapter {
     private final CityScenery scenery = new CityScenery(2026L);
     private final Vector2 touch = new Vector2();
     private final Array<Obstacle> obstacles = new Array<>();
+    private final OptionMenu pauseMenu = new OptionMenu(10.2f, 1.1f, 0.5f,
+        "CONTINUAR", "REINICIAR", "MENU PRINCIPAL");
+    private final OptionMenu deadMenu = new OptionMenu(7.8f, 0.9f, 0.45f,
+        "TENTAR DE NOVO", "MENU PRINCIPAL");
 
     private final float[] px = new float[MAX_PARTICLES];
     private final float[] py = new float[MAX_PARTICLES];
@@ -187,6 +197,8 @@ public class GameScreen extends ScreenAdapter {
     private void setState(State s) {
         state = s;
         stateTimer = 0f;
+        if (s == State.PAUSED) pauseMenu.reset();
+        if (s == State.DEAD) deadMenu.reset();
     }
 
     // ---------------------------------------------------------------- loop
@@ -223,6 +235,7 @@ public class GameScreen extends ScreenAdapter {
 
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         scenery.drawRain(shapes);
+        if (state == State.RUNNING) drawPauseButton();
         if (state == State.PAUSED) {
             shapes.setColor(0f, 0f, 0.03f, 0.65f);
             shapes.rect(0, 0, W, H);
@@ -242,13 +255,13 @@ public class GameScreen extends ScreenAdapter {
     // ---------------------------------------------------------------- entrada
 
     private boolean handleInput() {
-        boolean confirm = Gdx.input.isKeyJustPressed(Keys.ENTER)
-            || Gdx.input.isKeyJustPressed(Keys.SPACE)
-            || Gdx.input.justTouched();
-
         if (Gdx.input.isKeyJustPressed(Keys.ESCAPE) || Gdx.input.isKeyJustPressed(Keys.P)) {
             if (state == State.RUNNING) setState(State.PAUSED);
             else if (state == State.PAUSED) setState(State.RUNNING);
+        }
+        if (state == State.RUNNING && Gdx.input.justTouched()) {
+            viewport.unproject(touch.set(Gdx.input.getX(), Gdx.input.getY()));
+            if (inPauseZone(touch.x, touch.y)) setState(State.PAUSED);
         }
         if (Gdx.input.isKeyJustPressed(Keys.R)) {
             resetRun();
@@ -258,10 +271,34 @@ public class GameScreen extends ScreenAdapter {
             game.setScreen(new MenuScreen(game));
             return true;
         }
-        if (state == State.DEAD && stateTimer > 0.4f && confirm) {
-            resetRun();
+
+        int choice = -1;
+        if (state == State.PAUSED) choice = pauseMenu.update(viewport);
+        else if (state == State.DEAD && stateTimer > 0.4f) choice = deadMenu.update(viewport);
+        if (choice < 0) return false;
+
+        if (state == State.PAUSED) {
+            if (choice == 0) {
+                setState(State.RUNNING);
+            } else if (choice == 1) {
+                resetRun();
+            } else {
+                game.setScreen(new MenuScreen(game));
+                return true;
+            }
+        } else { // DEAD
+            if (choice == 0) {
+                resetRun();
+            } else {
+                game.setScreen(new MenuScreen(game));
+                return true;
+            }
         }
         return false;
+    }
+
+    private static boolean inPauseZone(float x, float y) {
+        return Math.abs(x - PAUSE_CX) <= PAUSE_HIT && Math.abs(y - PAUSE_CY) <= PAUSE_HIT;
     }
 
     // ---------------------------------------------------------------- logica
@@ -275,7 +312,7 @@ public class GameScreen extends ScreenAdapter {
         if (Gdx.input.isKeyPressed(Keys.RIGHT) || Gdx.input.isKeyPressed(Keys.D)) dir += 1f;
         if (Gdx.input.isTouched()) {
             viewport.unproject(touch.set(Gdx.input.getX(), Gdx.input.getY()));
-            dir += touch.x < W / 2f ? -1f : 1f;
+            if (!inPauseZone(touch.x, touch.y)) dir += touch.x < W / 2f ? -1f : 1f;
         }
         dir = MathUtils.clamp(dir, -1f, 1f);
 
@@ -452,6 +489,15 @@ public class GameScreen extends ScreenAdapter {
         shapes.rect(o.x, top - 0.08f, o.w, 0.08f);
     }
 
+    private void drawPauseButton() {
+        float s = PAUSE_SIZE;
+        shapes.setColor(Theme.WHITE.r, Theme.WHITE.g, Theme.WHITE.b, 0.10f);
+        shapes.rect(PAUSE_CX - s / 2f, PAUSE_CY - s / 2f, s, s);
+        shapes.setColor(Theme.CYAN.r, Theme.CYAN.g, Theme.CYAN.b, 0.8f);
+        shapes.rect(PAUSE_CX - s * 0.22f, PAUSE_CY - s * 0.28f, s * 0.14f, s * 0.56f);
+        shapes.rect(PAUSE_CX + s * 0.08f, PAUSE_CY - s * 0.28f, s * 0.14f, s * 0.56f);
+    }
+
     private void drawHud() {
         boolean beating = bestAtStart > 0 && score > bestAtStart;
         Color scoreColor = beating ? Theme.YELLOW : Theme.WHITE;
@@ -474,15 +520,15 @@ public class GameScreen extends ScreenAdapter {
             float a = MathUtils.clamp(hintTimer, 0f, 1f) * 0.8f;
             game.drawText("SETAS / A D / TOQUE NAS LATERAIS: mover", 0.32f, Theme.WHITE, a,
                 0f, 1.6f, W, Align.center);
-            game.drawText("P: pausar     R: reiniciar", 0.32f, Theme.WHITE, a,
+            game.drawText("P ou botao do topo: pausar     R: reiniciar", 0.32f, Theme.WHITE, a,
                 0f, 1.1f, W, Align.center);
         }
 
         if (state == State.PAUSED) {
-            game.drawText("PAUSADO", 1.0f, Theme.MAGENTA, 1f, 0f, 10.5f, W, Align.center);
-            game.drawText("ESC / P   continuar", 0.4f, Theme.WHITE, 1f, 0f, 9f, W, Align.center);
-            game.drawText("R   reiniciar", 0.4f, Theme.WHITE, 1f, 0f, 8.4f, W, Align.center);
-            game.drawText("M   menu principal", 0.4f, Theme.WHITE, 1f, 0f, 7.8f, W, Align.center);
+            game.drawText("PAUSADO", 1.0f, Theme.MAGENTA, 1f, 0f, 11.8f, W, Align.center);
+            pauseMenu.draw(game, stateTimer);
+            game.drawText("SETAS + ENTER, ou toque     P / ESC: continuar", 0.3f, Theme.WHITE, 0.6f,
+                0f, 6.4f, W, Align.center);
         }
 
         if (state == State.DEAD) {
@@ -494,9 +540,7 @@ public class GameScreen extends ScreenAdapter {
                 game.drawText("RECORDE: " + game.getBestScore(), 0.4f, Theme.CYAN, 1f, 0f, 9.0f, W, Align.center);
             }
             if (stateTimer > 0.4f) {
-                game.drawText("ENTER / ESPACO / TOQUE: tentar de novo", 0.36f, Theme.WHITE, 1f,
-                    0f, 7.8f, W, Align.center);
-                game.drawText("M: menu", 0.36f, Theme.WHITE, 0.8f, 0f, 7.2f, W, Align.center);
+                deadMenu.draw(game, stateTimer);
             }
         }
     }
