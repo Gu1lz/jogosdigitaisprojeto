@@ -1,4 +1,4 @@
-package br.mackenzie;
+package br.mackenzie.serial;
 
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
@@ -7,6 +7,10 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Rectangle;
 
+/**
+ * Experimento de leitura serial (Arduino/IoT). Ainda nao e usado pelo jogo (Main).
+ * Porta: -Darduino.port=ttyACM0 (Linux) ou COM3 (Windows). Use SerialPortLister para descobrir.
+ */
 public class ArduinoGame extends ApplicationAdapter {
     private OrthographicCamera camera;
     private ShapeRenderer shapeRenderer;
@@ -30,8 +34,8 @@ public class ArduinoGame extends ApplicationAdapter {
         player.height = 30;
 
         // Inicia a thread de leitura serial
-        // Mude "COM3" para a porta do seu Arduino
-        arduinoReader = new ArduinoReaderThread("COM3");
+        String portName = System.getProperty("arduino.port", "COM3");
+        arduinoReader = new ArduinoReaderThread(portName);
         arduinoReader.start();
     }
 
