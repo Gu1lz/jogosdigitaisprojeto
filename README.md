@@ -36,7 +36,7 @@ Inicialmente, a mecânica poderá ser desenvolvida com comandos simulados. Na ve
 
 ### 6. Fases e dificuldade progressiva
 
-O jogo contará com **6 fases**, com dificuldade progressiva.
+O jogo contará com **3 fases**, com dificuldade progressiva.
 
 A dificuldade poderá variar de acordo com os movimentos registrados pelo sensor e o desempenho do jogador. A adaptação deverá considerar a consistência dos comandos e a taxa de acertos, evitando que movimentos involuntários aumentem automaticamente o desafio.
 
