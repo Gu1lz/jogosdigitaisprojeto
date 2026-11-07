@@ -1,15 +1,6 @@
 # jogosdigitaisprojeto — Projeto IoT
 
-## Jogo sério para reabilitação com libGDX
-
-### Alterações
-
-* **[Add]** Tela de Menu Principal com opções de navegação.
-* **[Add]** Tela de Gameplay estruturada para o loop do jogo.
-* **[Add]** Personagem jogável com controles de movimento.
-* **[Add]** Cenário e elementos visuais de ambientação.
-* **[Add]** Sistema de colisão para delimitar áreas e obstáculos.
-* **[Add]** Sistema de pontuação com exibição em tempo real na HUD.
+## Jogo HeadRush libGDX
 
 ### 1. Visão geral
 
@@ -74,4 +65,4 @@ A adequação ao público-alvo e os possíveis benefícios para a reabilitação
 
 ### 10. Prazo de entrega
 
-**Data limite: 1º de novembro de 2026.**
+**Data limite: 11 de novembro de 2026.**
