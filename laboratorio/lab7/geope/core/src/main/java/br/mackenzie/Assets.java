@@ -50,7 +50,7 @@ public final class Assets implements Disposable {
         BossSprites b = new BossSprites();
         b.name   = name;
         b.normal = loadOne(folder + "/normal.png");
-        b.attack = loadOne(folder + "/ataquepng");
+        b.attack = loadOne(folder + "/ataque.png");
         b.scream = loadOne(folder + "/grito.png");
         b.hit    = loadOne(folder + "/hit.png");
         b.death  = loadOne(folder + "/morte.png");
