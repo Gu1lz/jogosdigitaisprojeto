@@ -26,24 +26,23 @@ public class GameScreen extends ScreenAdapter {
     private static final float BOUND = CityScenery.BOUND;
 
     private static final float PLAYER_Y = 3.6f;
-    private static final float PLAYER_SIZE = 1f;       // tamanho do halo
-    private static final float HIT_R = 0.34f;          // raio da hitbox
+    private static final float PLAYER_SIZE = 1f;
+    private static final float HIT_R = 0.34f;
     private static final float LATERAL_SPEED = 10f;
-    private static final float HEAD_DRAW_SIZE = 1.3f;  // tamanho do sprite na tela
+    private static final float HEAD_DRAW_SIZE = 1.3f;
 
     private static final float BASE_SPEED = 7f;
     private static final float MAX_SPEED = 13f;
     private static final float FIRST_ROW = 14f;
-    private static final float GEN_AHEAD = 20f;        // metros gerados a frente
+    private static final float GEN_AHEAD = 20f;
     private static final int POINTS_PER_METER = 10;
 
     private static final int MAX_PARTICLES = 220;
 
-    // botao de pausa (toque), no topo central
     private static final float PAUSE_CX = W / 2f;
     private static final float PAUSE_CY = H - 0.95f;
     private static final float PAUSE_SIZE = 0.8f;
-    private static final float PAUSE_HIT = 0.7f; // meia-largura da area de toque
+    private static final float PAUSE_HIT = 0.7f;
 
     private final Main game;
     private final SpriteBatch batch;
@@ -53,74 +52,41 @@ public class GameScreen extends ScreenAdapter {
     private final CityScenery scenery = new CityScenery(2026L);
     private final Vector2 touch = new Vector2();
     private final Array<Obstacle> obstacles = new Array<>();
+    private final Particle[] particles = new Particle[MAX_PARTICLES];
     private final OptionMenu pauseMenu = new OptionMenu(10.2f, 1.1f, 0.5f,
         "CONTINUAR", "REINICIAR", "MENU PRINCIPAL");
     private final OptionMenu deadMenu = new OptionMenu(7.8f, 0.9f, 0.45f,
         "TENTAR DE NOVO", "MENU PRINCIPAL");
-
-    private final float[] px = new float[MAX_PARTICLES];
-    private final float[] py = new float[MAX_PARTICLES];
-    private final float[] pvx = new float[MAX_PARTICLES];
-    private final float[] pvy = new float[MAX_PARTICLES];
-    private final float[] plife = new float[MAX_PARTICLES];
-    private final float[] pmax = new float[MAX_PARTICLES];
-    private final float[] psize = new float[MAX_PARTICLES];
-    private final float[] pr = new float[MAX_PARTICLES];
-    private final float[] pg = new float[MAX_PARTICLES];
-    private final float[] pb = new float[MAX_PARTICLES];
     private int pHead;
 
-    // gerador de obstaculos
     private Random genRnd;
-    private float genPos;
-    private float genCenter;
-    private float genLastPos;
-    private float genPrevH;
+    private float genPos, genCenter, genLastPos, genPrevH;
     private boolean genFirst;
 
     private State state;
-    private float stateTimer;
-    private float scrollSpeed;
-
-    private int attempt;
-    private int score;
-    private int bestAtStart;
+    private float stateTimer, scrollSpeed;
+    private int attempt, score, bestAtStart;
     private boolean newRecord;
-
-    private float playerX;
-    private float velX;
-    private float time;
-    private float trailTimer;
-    private float introTimer;
-    private float hintTimer;
+    private float playerX, velX, time, trailTimer, introTimer, hintTimer;
 
     public GameScreen(Main game) {
         this.game = game;
         this.batch = game.getBatch();
         this.shapes = game.getShapes();
         this.assets = game.getAssets();
+        for (int i = 0; i < MAX_PARTICLES; i++) particles[i] = new Particle();
         resetRun();
     }
 
-    // ---------------------------------------------------------------- dificuldade (em funcao da distancia, em metros)
+    private static float speedAt(float d) { return Math.min(MAX_SPEED, BASE_SPEED + d * 0.01f); }
 
-    private static float speedAt(float d) {
-        return Math.min(MAX_SPEED, BASE_SPEED + d * 0.01f);
-    }
+    private static float gapAt(float d) { return Math.max(2.8f, 4.4f - d * 0.002f); }
 
-    private static float gapAt(float d) {
-        return Math.max(2.8f, 4.4f - d * 0.002f);
-    }
-
-    private static float spacingAt(float d) {
-        return Math.max(6f, 9f - d * 0.004f);
-    }
+    private static float spacingAt(float d) { return Math.max(6f, 9f - d * 0.004f); }
 
     private static float spikeChanceAt(float d) {
         return d < 150f ? 0f : Math.min(0.5f, 0.1f + (d - 150f) * 0.0006f);
     }
-
-    // ---------------------------------------------------------------- partida
 
     private void resetRun() {
         attempt++;
@@ -134,7 +100,7 @@ public class GameScreen extends ScreenAdapter {
         score = 0;
         newRecord = false;
         bestAtStart = game.getBestScore();
-        for (int i = 0; i < MAX_PARTICLES; i++) plife[i] = 0f;
+        for (Particle p : particles) p.life = 0f;
 
         obstacles.clear();
         genRnd = new Random();
@@ -153,8 +119,6 @@ public class GameScreen extends ScreenAdapter {
         while (genPos < limit) addRow();
     }
 
-    // Parede com uma abertura. O deslocamento da abertura respeita o tempo de reacao
-    // na velocidade daquele ponto, entao nunca gera trecho impossivel.
     private void addRow() {
         float pos = genPos;
         float gap = gapAt(pos);
@@ -164,22 +128,18 @@ public class GameScreen extends ScreenAdapter {
         float rowH = spike ? 0.9f : 0.8f;
 
         if (genFirst) {
-            genCenter = MathUtils.clamp(W / 2f + (genRnd.nextFloat() - 0.5f) * 2f, lo, hi);
+            genCenter = W / 2f + (genRnd.nextFloat() - 0.5f) * 2f;
         } else {
             float freeTime = Math.max(0.1f, (pos - genLastPos - genPrevH) / speedAt(pos));
             float maxShift = Math.max(0.4f, LATERAL_SPEED * freeTime * 0.8f - (gap - 2f * HIT_R));
             genCenter += (genRnd.nextFloat() * 2f - 1f) * maxShift;
-            genCenter = MathUtils.clamp(genCenter, lo, hi);
         }
+        genCenter = MathUtils.clamp(genCenter, lo, hi);
 
         float gapL = genCenter - gap / 2f;
         float gapR = genCenter + gap / 2f;
-        if (gapL - BOUND > 0.05f) {
-            obstacles.add(new Obstacle(BOUND, pos, gapL - BOUND, rowH, spike));
-        }
-        if ((W - BOUND) - gapR > 0.05f) {
-            obstacles.add(new Obstacle(gapR, pos, (W - BOUND) - gapR, rowH, spike));
-        }
+        if (gapL - BOUND > 0.05f) obstacles.add(new Obstacle(BOUND, pos, gapL - BOUND, rowH, spike));
+        if ((W - BOUND) - gapR > 0.05f) obstacles.add(new Obstacle(gapR, pos, (W - BOUND) - gapR, rowH, spike));
 
         genLastPos = pos;
         genPrevH = rowH;
@@ -201,30 +161,28 @@ public class GameScreen extends ScreenAdapter {
         if (s == State.DEAD) deadMenu.reset();
     }
 
-    // ---------------------------------------------------------------- loop
-
     @Override
     public void render(float delta) {
         delta = Math.min(delta, 1f / 30f);
-
         if (handleInput()) return;
 
         stateTimer += delta;
-        if (state != State.PAUSED) time += delta;
-        if (state == State.RUNNING) update(delta);
-        if (state != State.PAUSED) updateParticles(delta);
+        if (state != State.PAUSED) {
+            time += delta;
+            if (state == State.RUNNING) update(delta);
+            updateParticles(delta);
+        }
 
         ScreenUtils.clear(Theme.VOID);
         viewport.apply();
         shapes.setProjectionMatrix(viewport.getCamera().combined);
         batch.setProjectionMatrix(viewport.getCamera().combined);
-
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
 
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         scenery.draw(shapes);
-        for (int i = 0; i < obstacles.size; i++) drawObstacle(obstacles.get(i));
+        for (Obstacle o : obstacles) drawObstacle(o);
         drawParticles();
         if (state != State.DEAD) HeadRenderer.drawGlow(shapes, playerX, PLAYER_Y + bob(), PLAYER_SIZE);
         shapes.end();
@@ -252,8 +210,6 @@ public class GameScreen extends ScreenAdapter {
         viewport.update(width, height, true);
     }
 
-    // ---------------------------------------------------------------- entrada
-
     private boolean handleInput() {
         if (Gdx.input.isKeyJustPressed(Keys.ESCAPE) || Gdx.input.isKeyJustPressed(Keys.P)) {
             if (state == State.RUNNING) setState(State.PAUSED);
@@ -277,31 +233,19 @@ public class GameScreen extends ScreenAdapter {
         else if (state == State.DEAD && stateTimer > 0.4f) choice = deadMenu.update(viewport);
         if (choice < 0) return false;
 
-        if (state == State.PAUSED) {
-            if (choice == 0) {
-                setState(State.RUNNING);
-            } else if (choice == 1) {
-                resetRun();
-            } else {
-                game.setScreen(new MenuScreen(game));
-                return true;
-            }
-        } else { // DEAD
-            if (choice == 0) {
-                resetRun();
-            } else {
-                game.setScreen(new MenuScreen(game));
-                return true;
-            }
+        boolean toMenu = state == State.PAUSED ? choice == 2 : choice == 1;
+        if (toMenu) {
+            game.setScreen(new MenuScreen(game));
+            return true;
         }
+        if (state == State.PAUSED && choice == 0) setState(State.RUNNING);
+        else resetRun();
         return false;
     }
 
     private static boolean inPauseZone(float x, float y) {
         return Math.abs(x - PAUSE_CX) <= PAUSE_HIT && Math.abs(y - PAUSE_CY) <= PAUSE_HIT;
     }
-
-    // ---------------------------------------------------------------- logica
 
     private void update(float delta) {
         hintTimer = Math.max(0f, hintTimer - delta);
@@ -321,8 +265,10 @@ public class GameScreen extends ScreenAdapter {
 
         float minX = BOUND + HIT_R;
         float maxX = W - BOUND - HIT_R;
-        if (playerX < minX) { playerX = minX; velX = 0f; }
-        if (playerX > maxX) { playerX = maxX; velX = 0f; }
+        if (playerX < minX || playerX > maxX) {
+            playerX = MathUtils.clamp(playerX, minX, maxX);
+            velX = 0f;
+        }
 
         scrollSpeed = speedAt(scenery.getScroll());
         scenery.advance(delta, scrollSpeed);
@@ -337,8 +283,7 @@ public class GameScreen extends ScreenAdapter {
 
     private boolean hitsObstacle() {
         float scroll = scenery.getScroll();
-        for (int i = 0; i < obstacles.size; i++) {
-            Obstacle o = obstacles.get(i);
+        for (Obstacle o : obstacles) {
             float y0 = PLAYER_Y + (o.pos - scroll);
             if (y0 > PLAYER_Y + 2f || y0 + o.h < PLAYER_Y - 2f) continue;
 
@@ -356,10 +301,8 @@ public class GameScreen extends ScreenAdapter {
 
     private static boolean circleHitsRect(float cx, float cy, float r,
                                           float rx, float ry, float rw, float rh) {
-        float nx = MathUtils.clamp(cx, rx, rx + rw);
-        float ny = MathUtils.clamp(cy, ry, ry + rh);
-        float dx = cx - nx;
-        float dy = cy - ny;
+        float dx = cx - MathUtils.clamp(cx, rx, rx + rw);
+        float dy = cy - MathUtils.clamp(cy, ry, ry + rh);
         return dx * dx + dy * dy <= r * r;
     }
 
@@ -381,8 +324,6 @@ public class GameScreen extends ScreenAdapter {
         }
     }
 
-    // ---------------------------------------------------------------- particulas
-
     private void emitTrail(float delta) {
         trailTimer -= delta;
         while (trailTimer <= 0f) {
@@ -395,39 +336,36 @@ public class GameScreen extends ScreenAdapter {
     }
 
     private void emit(float x, float y, float vx, float vy, float life, float size, Color c) {
-        int i = pHead;
+        Particle p = particles[pHead];
         pHead = (pHead + 1) % MAX_PARTICLES;
-        px[i] = x;
-        py[i] = y;
-        pvx[i] = vx;
-        pvy[i] = vy;
-        plife[i] = life;
-        pmax[i] = life;
-        psize[i] = size;
-        pr[i] = c.r;
-        pg[i] = c.g;
-        pb[i] = c.b;
+        p.x = x;
+        p.y = y;
+        p.vx = vx;
+        p.vy = vy;
+        p.life = p.max = life;
+        p.size = size;
+        p.r = c.r;
+        p.g = c.g;
+        p.b = c.b;
     }
 
     private void updateParticles(float delta) {
-        for (int i = 0; i < MAX_PARTICLES; i++) {
-            if (plife[i] <= 0f) continue;
-            plife[i] -= delta;
-            px[i] += pvx[i] * delta;
-            py[i] += pvy[i] * delta;
+        for (Particle p : particles) {
+            if (p.life <= 0f) continue;
+            p.life -= delta;
+            p.x += p.vx * delta;
+            p.y += p.vy * delta;
         }
     }
 
     private void drawParticles() {
-        for (int i = 0; i < MAX_PARTICLES; i++) {
-            if (plife[i] <= 0f) continue;
-            float a = plife[i] / pmax[i];
-            shapes.setColor(pr[i], pg[i], pb[i], a);
-            shapes.circle(px[i], py[i], psize[i] * (0.5f + 0.5f * a), 8);
+        for (Particle p : particles) {
+            if (p.life <= 0f) continue;
+            float a = p.life / p.max;
+            shapes.setColor(p.r, p.g, p.b, a);
+            shapes.circle(p.x, p.y, p.size * (0.5f + 0.5f * a), 8);
         }
     }
-
-    // ---------------------------------------------------------------- desenho
 
     private float bob() {
         return state == State.DEAD ? 0f : MathUtils.sin(time * 5f) * 0.05f;
@@ -435,9 +373,7 @@ public class GameScreen extends ScreenAdapter {
 
     private void drawPlayer() {
         boolean dead = state == State.DEAD;
-        TextureRegion frame = dead
-            ? assets.hit.getKeyFrame(stateTimer)
-            : assets.neutral.getKeyFrame(time);
+        TextureRegion frame = dead ? assets.hit.getKeyFrame(stateTimer) : assets.neutral.getKeyFrame(time);
         float tilt = dead ? 0f : -velX * 2.2f;
         HeadRenderer.drawSprite(batch, frame, playerX, PLAYER_Y + bob(), HEAD_DRAW_SIZE, tilt);
     }
@@ -498,54 +434,42 @@ public class GameScreen extends ScreenAdapter {
         shapes.rect(PAUSE_CX + s * 0.08f, PAUSE_CY - s * 0.28f, s * 0.14f, s * 0.56f);
     }
 
+    private void center(String text, float size, Color color, float alpha, float y) {
+        game.drawText(text, size, color, alpha, 0f, y, W, Align.center);
+    }
+
     private void drawHud() {
         boolean beating = bestAtStart > 0 && score > bestAtStart;
-        Color scoreColor = beating ? Theme.YELLOW : Theme.WHITE;
 
-        // canto superior direito: pontos
-        game.drawText(String.valueOf(score), 0.75f, scoreColor, 1f, 0f, H - 0.3f, W - 0.4f, Align.right);
+        game.drawText(String.valueOf(score), 0.75f, beating ? Theme.YELLOW : Theme.WHITE, 1f,
+            0f, H - 0.3f, W - 0.4f, Align.right);
         game.drawText("PONTOS", 0.28f, Theme.WHITE, 0.7f, 0f, H - 1.2f, W - 0.4f, Align.right);
 
-        // canto superior esquerdo: recorde
         game.drawText("RECORDE", 0.28f, Theme.WHITE, 0.7f, 0.4f, H - 0.3f, 4f, Align.left);
         game.drawText(String.valueOf(Math.max(bestAtStart, score)), 0.5f, Theme.CYAN, 1f,
             0.4f, H - 0.7f, 4f, Align.left);
 
-        if (state == State.RUNNING && introTimer > 0f) {
-            float a = MathUtils.clamp(introTimer, 0f, 1f);
-            game.drawText("TENTATIVA " + attempt, 1.0f, Theme.MAGENTA, a, 0f, H * 0.62f, W, Align.center);
-        }
-
-        if (state == State.RUNNING && hintTimer > 0f) {
-            float a = MathUtils.clamp(hintTimer, 0f, 1f) * 0.8f;
-            game.drawText("SETAS / A D / TOQUE NAS LATERAIS: mover", 0.32f, Theme.WHITE, a,
-                0f, 1.6f, W, Align.center);
-            game.drawText("P ou botao do topo: pausar     R: reiniciar", 0.32f, Theme.WHITE, a,
-                0f, 1.1f, W, Align.center);
-        }
-
-        if (state == State.PAUSED) {
-            game.drawText("PAUSADO", 1.0f, Theme.MAGENTA, 1f, 0f, 11.8f, W, Align.center);
+        if (state == State.RUNNING) {
+            if (introTimer > 0f) {
+                center("TENTATIVA " + attempt, 1.0f, Theme.MAGENTA, MathUtils.clamp(introTimer, 0f, 1f), H * 0.62f);
+            }
+            if (hintTimer > 0f) {
+                float a = MathUtils.clamp(hintTimer, 0f, 1f) * 0.8f;
+                center("SETAS / A D / TOQUE NAS LATERAIS: mover", 0.32f, Theme.WHITE, a, 1.6f);
+                center("P ou botao do topo: pausar     R: reiniciar", 0.32f, Theme.WHITE, a, 1.1f);
+            }
+        } else if (state == State.PAUSED) {
+            center("PAUSADO", 1.0f, Theme.MAGENTA, 1f, 11.8f);
             pauseMenu.draw(game, stateTimer);
-            game.drawText("SETAS + ENTER, ou toque     P / ESC: continuar", 0.3f, Theme.WHITE, 0.6f,
-                0f, 6.4f, W, Align.center);
-        }
-
-        if (state == State.DEAD) {
-            game.drawText("VOCE BATEU!", 0.9f, Theme.RED, 1f, 0f, 10.8f, W, Align.center);
-            game.drawText("PONTOS: " + score, 0.5f, Theme.WHITE, 1f, 0f, 9.7f, W, Align.center);
-            if (newRecord) {
-                game.drawText("NOVO RECORDE!", 0.5f, Theme.YELLOW, 1f, 0f, 9.0f, W, Align.center);
-            } else {
-                game.drawText("RECORDE: " + game.getBestScore(), 0.4f, Theme.CYAN, 1f, 0f, 9.0f, W, Align.center);
-            }
-            if (stateTimer > 0.4f) {
-                deadMenu.draw(game, stateTimer);
-            }
+            center("SETAS + ENTER, ou toque     P / ESC: continuar", 0.3f, Theme.WHITE, 0.6f, 6.4f);
+        } else {
+            center("VOCE BATEU!", 0.9f, Theme.RED, 1f, 10.8f);
+            center("PONTOS: " + score, 0.5f, Theme.WHITE, 1f, 9.7f);
+            if (newRecord) center("NOVO RECORDE!", 0.5f, Theme.YELLOW, 1f, 9.0f);
+            else center("RECORDE: " + game.getBestScore(), 0.4f, Theme.CYAN, 1f, 9.0f);
+            if (stateTimer > 0.4f) deadMenu.draw(game, stateTimer);
         }
     }
-
-    // ---------------------------------------------------------------- tipos
 
     private static final class Obstacle {
         final float x, pos, w, h;
@@ -558,5 +482,9 @@ public class GameScreen extends ScreenAdapter {
             this.h = h;
             this.spike = spike;
         }
+    }
+
+    private static final class Particle {
+        float x, y, vx, vy, life, max, size, r, g, b;
     }
 }
