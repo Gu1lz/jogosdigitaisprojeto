@@ -11,10 +11,20 @@ import com.badlogic.gdx.utils.GdxRuntimeException;
 
 public final class Assets implements Disposable {
 
-    private static final boolean PIXEL_ART = false; // true = filtro Nearest
+    private static final boolean PIXEL_ART = false;
+
+    public static final class BossSprites {
+        public String name;
+        public TextureRegion normal;
+        public TextureRegion attack;
+        public TextureRegion scream;
+        public TextureRegion hit;
+        public TextureRegion death;
+    }
 
     public final Animation<TextureRegion> neutral;
     public final Animation<TextureRegion> hit;
+    public final Array<BossSprites> bosses = new Array<>();
 
     private final Array<Texture> textures = new Array<>();
 
@@ -32,21 +42,38 @@ public final class Assets implements Disposable {
             "hit/3.png",
             "hit/4.png",
             "hit/5.png");
+
+        bosses.add(loadBoss("Tung Tung Tung Sahur", "boss1"));
+    }
+
+    private BossSprites loadBoss(String name, String folder) {
+        BossSprites b = new BossSprites();
+        b.name   = name;
+        b.normal = loadOne(folder + "/normal.png");
+        b.attack = loadOne(folder + "/attack.png");
+        b.scream = loadOne(folder + "/scream.png");
+        b.hit    = loadOne(folder + "/hit.png");
+        b.death  = loadOne(folder + "/death.png");
+        return b;
+    }
+
+    private TextureRegion loadOne(String path) {
+        FileHandle file = Gdx.files.internal(path);
+        if (!file.exists()) {
+            throw new GdxRuntimeException("Sprite nao encontrado: " + path
+                + " (confira se a pasta assets/ foi commitada e se o working dir do lwjgl3 aponta para ela)");
+        }
+        Texture t = new Texture(file);
+        Texture.TextureFilter filter = PIXEL_ART ? Texture.TextureFilter.Nearest : Texture.TextureFilter.Linear;
+        t.setFilter(filter, filter);
+        textures.add(t);
+        return new TextureRegion(t);
     }
 
     private Animation<TextureRegion> load(float frameDuration, Animation.PlayMode mode, String... paths) {
         Array<TextureRegion> frames = new Array<>();
-        Texture.TextureFilter filter = PIXEL_ART ? Texture.TextureFilter.Nearest : Texture.TextureFilter.Linear;
         for (String path : paths) {
-            FileHandle file = Gdx.files.internal(path);
-            if (!file.exists()) {
-                throw new GdxRuntimeException("Sprite nao encontrado: " + path
-                    + " (confira se a pasta assets/ foi commitada e se o working dir do lwjgl3 aponta para ela)");
-            }
-            Texture t = new Texture(file);
-            t.setFilter(filter, filter);
-            textures.add(t);
-            frames.add(new TextureRegion(t));
+            frames.add(loadOne(path));
         }
         return new Animation<TextureRegion>(frameDuration, frames, mode);
     }
