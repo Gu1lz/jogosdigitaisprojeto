@@ -4,10 +4,8 @@ import com.fazecast.jSerialComm.SerialPort;
 import java.io.InputStream;
 
 public class ArduinoReaderThread extends Thread {
-    
-    // A palavra-chave 'volatile' garante que o valor seja visível
-    // para todas as threads, garantindo a comunicação segura.
-    private volatile String lastData = "Nenhum dado";
+
+    private volatile String lastData = "TILT:0";
     private SerialPort arduinoPort;
 
     public ArduinoReaderThread(String portName) {
@@ -17,7 +15,7 @@ public class ArduinoReaderThread extends Thread {
     @Override
     public void run() {
         if (!arduinoPort.openPort()) {
-            System.err.println("Erro: Não foi possível abrir a porta serial.");
+            System.err.println("Aviso: Nao foi possivel abrir a porta serial. Jogo usara teclado/toque.");
             return;
         }
 
@@ -32,8 +30,10 @@ public class ArduinoReaderThread extends Thread {
                     currentLine.append(character);
 
                     if (character == '\n') {
-                        // Armazena a linha completa no shared variable
-                        lastData = currentLine.toString().trim();
+                        String texto = currentLine.toString().trim();
+                        if (texto.startsWith("TILT:")) {
+                            lastData = texto;
+                        }
                         currentLine.setLength(0);
                     }
                 }

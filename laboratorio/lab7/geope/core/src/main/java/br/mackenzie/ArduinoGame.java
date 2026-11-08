@@ -7,18 +7,13 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Rectangle;
 
-/**
- * Experimento de leitura serial (Arduino/IoT). Ainda nao e usado pelo jogo (Main).
- * Porta: -Darduino.port=ttyACM0 (Linux) ou COM3 (Windows). Use SerialPortLister para descobrir.
- */
 public class ArduinoGame extends ApplicationAdapter {
     private OrthographicCamera camera;
     private ShapeRenderer shapeRenderer;
 
     private Rectangle player;
-    private float playerSpeed = 200f; // Velocidade do jogador em pixels/segundo
+    private float playerSpeed = 200f;
 
-    // Instância da thread para comunicação serial
     private ArduinoReaderThread arduinoReader;
 
     @Override
@@ -33,8 +28,7 @@ public class ArduinoGame extends ApplicationAdapter {
         player.width = 30;
         player.height = 30;
 
-        // Inicia a thread de leitura serial
-        String portName = System.getProperty("arduino.port", "COM3");
+        String portName = System.getProperty("arduino.port", "/dev/ttyUSB0");
         arduinoReader = new ArduinoReaderThread(portName);
         arduinoReader.start();
     }
@@ -47,37 +41,31 @@ public class ArduinoGame extends ApplicationAdapter {
         camera.update();
         shapeRenderer.setProjectionMatrix(camera.combined);
 
-        // --- Lógica de Movimento ---
-        // Pega o último dado lido da thread
         String serialData = arduinoReader.getLastData();
         
-        if (serialData.equals("Sentido: 1")) {
+        if (serialData.equals("TILT:1")) {
             player.x += playerSpeed * Gdx.graphics.getDeltaTime();
-        } else if (serialData.equals("Sentido: -1")) {
+        } else if (serialData.equals("TILT:-1")) {
             player.x -= playerSpeed * Gdx.graphics.getDeltaTime();
         }
 
-        // Garante que o jogador não saia da tela
         if (player.x < 0) player.x = 0;
         if (player.x > 800 - player.width) player.x = 800 - player.width;
 
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-        shapeRenderer.setColor(0, 1, 0, 1); // Cor verde para o jogador
+        shapeRenderer.setColor(0, 1, 0, 1);
         shapeRenderer.rect(player.x, player.y, player.width, player.height);
         shapeRenderer.end();
     }
 
     @Override
     public void dispose() {
-        // MUITO IMPORTANTE: Garante que a thread seja parada
-        // e a porta serial liberada quando o jogo fechar.
         arduinoReader.stopReading();
         try {
             arduinoReader.join();
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-        
         shapeRenderer.dispose();
     }
 }

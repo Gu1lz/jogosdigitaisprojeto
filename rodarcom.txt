@@ -1,0 +1,1 @@
+./gradlew lwjgl3:run -Darduino.port=/dev/ttyUSB0

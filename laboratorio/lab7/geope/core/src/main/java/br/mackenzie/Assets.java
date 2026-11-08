@@ -13,7 +13,7 @@ public final class Assets implements Disposable {
 
     private static final boolean PIXEL_ART = false;
 
-    public static final class BossSprites {
+    public static final class SpritesChefe {
         public String name;
         public TextureRegion normal;
         public TextureRegion attack;
@@ -24,63 +24,72 @@ public final class Assets implements Disposable {
 
     public final Animation<TextureRegion> neutral;
     public final Animation<TextureRegion> hit;
-    public final Array<BossSprites> bosses = new Array<>();
+    public final Array<SpritesChefe> chefes = new Array<>();
 
-    private final Array<Texture> textures = new Array<>();
+    private final Array<Texture> texturas = new Array<>();
 
     public Assets() {
-        neutral = load(0.12f, Animation.PlayMode.LOOP,
+        neutral = carregarAnimacao(0.12f, Animation.PlayMode.LOOP,
             "neutro/sprite_001.png",
             "neutro/sprite_002.png",
             "neutro/sprite_003.png",
             "neutro/sprite_006.png",
             "neutro/sprite_009.png");
 
-        hit = load(0.08f, Animation.PlayMode.NORMAL,
+        hit = carregarAnimacao(0.08f, Animation.PlayMode.NORMAL,
             "hit/1.png",
             "hit/2.png",
             "hit/3.png",
             "hit/4.png",
             "hit/5.png");
 
-        bosses.add(loadBoss("Tung Tung Tung Sahur", "boss1"));
+        chefes.add(carregarChefe("Tung Tung Tung Sahur", "boss1"));
+        chefes.add(carregarChefe("Tralalero Tralala", "boss2"));
     }
 
-    private BossSprites loadBoss(String name, String folder) {
-        BossSprites b = new BossSprites();
-        b.name   = name;
-        b.normal = loadOne(folder + "/normal.png");
-        b.attack = loadOne(folder + "/ataque.png");
-        b.scream = loadOne(folder + "/grito.png");
-        b.hit    = loadOne(folder + "/hit.png");
-        b.death  = loadOne(folder + "/morte.png");
-        return b;
+    private SpritesChefe carregarChefe(String nome, String pasta) {
+        SpritesChefe c = new SpritesChefe();
+        c.name   = nome;
+        c.normal = carregarUma(pasta + "/normal.png");
+        c.attack = carregarUma(pasta + "/ataque.png");
+        c.scream = carregarUma(pasta + "/grito.png");
+        c.hit    = carregarUma(pasta + "/hit.png");
+        c.death  = carregarUma(pasta + "/morte.png");
+        return c;
     }
 
-    private TextureRegion loadOne(String path) {
-        FileHandle file = Gdx.files.internal(path);
-        if (!file.exists()) {
-            throw new GdxRuntimeException("Sprite nao encontrado: " + path
-                + " (confira se a pasta assets/ foi commitada e se o working dir do lwjgl3 aponta para ela)");
+    private TextureRegion carregarUma(String caminho) {
+        FileHandle arquivo = Gdx.files.internal(caminho);
+        if (!arquivo.exists()) {
+            throw new GdxRuntimeException("Sprite nao encontrado: " + caminho);
         }
-        Texture t = new Texture(file);
-        Texture.TextureFilter filter = PIXEL_ART ? Texture.TextureFilter.Nearest : Texture.TextureFilter.Linear;
-        t.setFilter(filter, filter);
-        textures.add(t);
+        Texture t = new Texture(arquivo);
+        Texture.TextureFilter filtro;
+        if (PIXEL_ART) {
+            filtro = Texture.TextureFilter.Nearest;
+        } else {
+            filtro = Texture.TextureFilter.Linear;
+        }
+        t.setFilter(filtro, filtro);
+        texturas.add(t);
         return new TextureRegion(t);
     }
 
-    private Animation<TextureRegion> load(float frameDuration, Animation.PlayMode mode, String... paths) {
-        Array<TextureRegion> frames = new Array<>();
-        for (String path : paths) {
-            frames.add(loadOne(path));
+    private Animation<TextureRegion> carregarAnimacao(float duracaoQuadro,
+                                                      Animation.PlayMode modo,
+                                                      String... caminhos) {
+        Array<TextureRegion> quadros = new Array<>();
+        for (String caminho : caminhos) {
+            quadros.add(carregarUma(caminho));
         }
-        return new Animation<TextureRegion>(frameDuration, frames, mode);
+        return new Animation<TextureRegion>(duracaoQuadro, quadros, modo);
     }
 
     @Override
     public void dispose() {
-        for (Texture t : textures) t.dispose();
-        textures.clear();
+        for (Texture t : texturas) {
+            t.dispose();
+        }
+        texturas.clear();
     }
 }

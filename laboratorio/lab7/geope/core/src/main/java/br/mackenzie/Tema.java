@@ -2,16 +2,15 @@ package br.mackenzie;
 
 import com.badlogic.gdx.graphics.Color;
 
-public final class Theme {
+public final class Tema {
 
-    private Theme() {}
+    private Tema() {}
 
-    public static final float WORLD_W = 9f;
-    public static final float WORLD_H = 16f;
+    public static final float LARGURA_MUNDO = 9f;
+    public static final float ALTURA_MUNDO  = 16f;
 
-    /** Nome unico do jogo (menu, preferencias). Mude so aqui. */
-    public static final String GAME_TITLE = "HEAD RUSH";
-    public static final String PREFS_NAME = "headrush";
+    public static final String TITULO_JOGO = "HEAD RUSH";
+    public static final String NOME_PREFS  = "headrush";
 
     public static final Color VOID          = new Color(0.02f, 0.01f, 0.06f, 1f);
     public static final Color SKY_TOP       = new Color(0.05f, 0.02f, 0.14f, 1f);

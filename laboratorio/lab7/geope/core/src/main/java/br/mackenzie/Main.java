@@ -23,43 +23,43 @@ public class Main extends Game {
         batch = new SpriteBatch();
         shapes = new ShapeRenderer();
         assets = new Assets();
-        prefs = Gdx.app.getPreferences("headdash");
+        prefs = Gdx.app.getPreferences(Tema.NOME_PREFS);
 
         font = new BitmapFont();
         font.setUseIntegerPositions(false);
-        font.getRegion().getTexture().setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+        font.getRegion().getTexture().setFilter(
+            Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
         fontBaseLineHeight = font.getLineHeight();
 
-        setScreen(new MenuScreen(this));
+        setScreen(new TelaMenu(this));
     }
 
-    public SpriteBatch getBatch() {
+    public SpriteBatch obterLote() {
         return batch;
     }
 
-    public ShapeRenderer getShapes() {
+    public ShapeRenderer obterFormas() {
         return shapes;
     }
 
-    public Assets getAssets() {
+    public Assets obterAssets() {
         return assets;
     }
 
-    public int getBestScore() {
+    public int obterMelhorPontuacao() {
         return prefs.getInteger("best", 0);
     }
 
-    public void setBestScore(int score) {
-        prefs.putInteger("best", score);
+    public void definirMelhorPontuacao(int pontos) {
+        prefs.putInteger("best", pontos);
         prefs.flush();
     }
 
-    /** Texto com altura de linha em unidades de mundo; y = topo do texto. Usar entre batch.begin()/end(). */
-    public void drawText(String text, float size, Color color, float alpha,
-                         float x, float y, float width, int align) {
-        font.getData().setScale(size / fontBaseLineHeight);
-        font.setColor(color.r, color.g, color.b, alpha);
-        font.draw(batch, text, x, y, width, align, false);
+    public void drawText(String texto, float tamanho, Color cor, float alpha,
+                         float x, float y, float largura, int alinhamento) {
+        font.getData().setScale(tamanho / fontBaseLineHeight);
+        font.setColor(cor.r, cor.g, cor.b, alpha);
+        font.draw(batch, texto, x, y, largura, alinhamento, false);
     }
 
     @Override
