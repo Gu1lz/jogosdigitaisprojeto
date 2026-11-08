@@ -63,7 +63,9 @@ public class TelaJogo extends ScreenAdapter {
         // INICIA O ARDUINO (Padrão Linux /dev/ttyUSB0 ou Windows COM3)
         String porta = System.getProperty("arduino.port", "/dev/ttyUSB0");
         leitorArduino = new ArduinoReaderThread(porta);
-        leitorArduino.start();
+        if (leitorArduino.isValido()) {
+            leitorArduino.start();
+        }
 
         iniciarNovaPartida();
     }

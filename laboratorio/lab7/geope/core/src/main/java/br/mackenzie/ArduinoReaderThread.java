@@ -7,13 +7,29 @@ public class ArduinoReaderThread extends Thread {
 
     private volatile String lastData = "TILT:0";
     private SerialPort arduinoPort;
+    private boolean valido;
 
     public ArduinoReaderThread(String portName) {
-        this.arduinoPort = SerialPort.getCommPort(portName);
+        try {
+            this.arduinoPort = SerialPort.getCommPort(portName);
+            this.valido = true;
+        } catch (Exception e) {
+            System.err.println("Aviso: Porta serial invalida: " + portName
+                + ". Jogo usara teclado/toque.");
+            this.arduinoPort = null;
+            this.valido = false;
+        }
+    }
+
+    public boolean isValido() {
+        return valido;
     }
 
     @Override
     public void run() {
+        if (arduinoPort == null) {
+            return;
+        }
         if (!arduinoPort.openPort()) {
             System.err.println("Aviso: Nao foi possivel abrir a porta serial. Jogo usara teclado/toque.");
             return;
