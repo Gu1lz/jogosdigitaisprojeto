@@ -1,0 +1,31 @@
+plugins {
+    id 'application'
+}
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+dependencies {
+    implementation 'com.badlogicgames.gdx:gdx:1.13.1'
+    implementation 'com.badlogicgames.gdx:gdx-backend-lwjgl3:1.13.1'
+    runtimeOnly 'com.badlogicgames.gdx:gdx-platform:1.13.1:natives-desktop'
+    implementation 'com.fazecast:jSerialComm:2.10.4'
+}
+
+application {
+    mainClass = 'br.mackenzie.ArduinoDemoLauncher'
+}
+
+tasks.named('run', JavaExec) {
+    systemProperty 'arduino.port', System.getProperty('arduino.port', '/dev/ttyACM0')
+    if (System.getProperty('os.name').toLowerCase().contains('mac')) {
+        jvmArgs '-XstartOnFirstThread'
+    }
+}
