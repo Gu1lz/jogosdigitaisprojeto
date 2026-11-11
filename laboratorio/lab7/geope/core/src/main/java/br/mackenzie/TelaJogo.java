@@ -177,13 +177,18 @@ public class TelaJogo extends ScreenAdapter {
     }
     
     @Override
+    public void hide() {
+        dispose();
+    }
+
+    @Override
     public void dispose() {
         if (leitorArduino != null) {
             leitorArduino.stopReading();
             try {
                 leitorArduino.join();
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                Thread.currentThread().interrupt();
             }
         }
     }

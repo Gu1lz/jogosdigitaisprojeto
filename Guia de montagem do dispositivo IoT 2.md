@@ -212,11 +212,13 @@ const int   THRESHOLD   = 3000;   // sensibilidade (ajuste)
 const int   N_MEDIA     = 5;      // tamanho da média móvel
 const int   DEADBAND    = 500;    // histerese para não oscilar
 const unsigned long INTERVALO_MS = 20;  // 50 leituras por segundo
+const unsigned long REENVIO_MS = 250;  // repete o estado para sincronizar com o jogo
 
 int buf[N_MEDIA];
 int idx = 0;
 int dirAnterior = 0;
 unsigned long ultimoEnvio = 0;
+unsigned long ultimoTilt = 0;
 unsigned long ultimoAviso = 0;
 bool sensorOk = false;
 
@@ -264,6 +266,7 @@ void setup() {
     for (int i = 0; i < N_MEDIA; i++) buf[i] = 0;
     sensorOk = acordarSensor();
     Serial.println("READY");
+    Serial.println("TILT:0");
 }
 
 void loop() {
@@ -296,10 +299,11 @@ void loop() {
     else if (media > -THRESHOLD && media < THRESHOLD) dir = 0;
     else dir = dirAnterior;  // dentro da zona morta, mantém o estado
 
-    if (dir != dirAnterior) {
+    if (dir != dirAnterior || millis() - ultimoTilt >= REENVIO_MS) {
         Serial.print("TILT:");
         Serial.println(dir);
         dirAnterior = dir;
+        ultimoTilt = millis();
     }
 }
 ```
@@ -308,8 +312,8 @@ void loop() {
 
 - Na escala padrão do sensor, **1 g = 16384**. Então um `THRESHOLD` de 3000 equivale a uma inclinação de uns **10 graus**.
 - O sistema só passa para `TILT:1` ou `TILT:-1` quando o valor ultrapassa 3500 (uns 12 graus) e só volta ao centro quando cai abaixo de 3000.
-- O ESP32 só envia uma mensagem quando o estado **muda**, para gerar menos tráfego. Por isso, o jogo deve **começar assumindo o estado centro (0)**.
-- Além do `TILT`, o ESP32 envia `READY` ao ligar e `ERRO: ...` se o sensor falhar. O jogo precisa ignorar essas linhas.
+- O ESP32 envia `TILT:0` ao iniciar, transmite imediatamente cada mudança e repete o estado atual a cada 250 ms. Isso permite sincronizar o jogo mesmo quando ele abre a porta depois de uma mudança de inclinação.
+- Além do `TILT`, o ESP32 envia `READY` ao ligar e `ERRO: ...` se o sensor falhar. O jogo mostra essas mensagens no console e retorna a direção para centro (0) ao recebê-las.
 
 **Esta versão é mais robusta que a anterior:** ela conversa com o sensor direto pela biblioteca `Wire`, sem verificar o código de identidade (módulos com chip "clone" eram rejeitados por essa verificação, mesmo funcionando). Também **não trava** se o sensor falhar: ela avisa com `ERRO: MPU6050 nao respondeu` a cada segundo, solta o personagem (`TILT:0`) e volta a funcionar sozinha quando o contato voltar.
 
@@ -377,26 +381,25 @@ Rode o programa e incline o módulo. Deve aparecer `READY` (o ESP32 reinicia qua
 
 ## Etapa 9 — Ligar ao jogo
 
-O jogo lê a porta pelo `ArduinoReaderThread`. Para ele saber qual porta usar:
+1. Feche o Monitor Serial e o Plotter Serial da Arduino IDE para liberar a porta.
+2. Descubra a porta do ESP32, por exemplo `/dev/ttyUSB0`, `/dev/ttyACM0` ou `COM3`.
+3. Abra um terminal em `laboratorio/lab7/geope` e execute o comando com a porta encontrada.
 
-1. Descubra o nome da porta (ex.: `COM3` no Windows, `/dev/ttyUSB0` no Linux). Ele muda de um computador para outro.
-2. Passe o nome como propriedade ao rodar o jogo, nas **VM options** da sua IDE:
-
-```
--Darduino.port=COM3
-```
-
-3. Ou fixe no `build.gradle` do módulo `lwjgl3`:
-
-```gradle
-application {
-    applicationDefaultJvmArgs = ["-Darduino.port=COM3"]
-}
+```bash
+./gradlew lwjgl3:run -Darduino.port=/dev/ttyUSB0
 ```
 
-4. Rode o jogo e incline a cabeça: o personagem deve se mover.
+No Windows, use o wrapper correspondente e a porta do Gerenciador de Dispositivos.
 
-**Atenção:** isso só funciona se o `ArduinoReaderThread` do projeto realmente ler a propriedade `arduino.port`, usar **9600 baud** e interpretar só as linhas que começam com `TILT:`. Confirme com quem escreveu essa classe.
+```bat
+gradlew.bat lwjgl3:run -Darduino.port=COM3
+```
+
+O `build.gradle` de `lwjgl3` repassa `arduino.port` à JVM que executa o jogo. Sem essa opção, o padrão é `/dev/ttyUSB0`. Ao executar diretamente pela IDE, configure `-Darduino.port=COM3` nas opções da JVM. Para o JAR, coloque a propriedade antes de `-jar`.
+
+Ao iniciar uma partida, confira no console `Serial aberta` com a porta selecionada e `9600 baud`. Ao inclinar o sensor, confira `Serial recebida` com `TILT:-1`, `TILT:0` ou `TILT:1`. A direção recebida permanece ativa até a próxima mensagem. O leitor é encerrado ao voltar ao menu ou fechar o jogo, liberando a porta para a próxima partida.
+
+Se a porta estiver incorreta ou ocupada, o console informa o problema e lista as portas disponíveis. Se aparecer `ERRO` enviado pelo ESP32, verifique a leitura do sensor pelo sketch. Se a porta abrir e nenhuma mudança de `TILT` aparecer, confira o sketch gravado, o eixo X e os limiares da Etapa 7.
 
 ## Etapa 10 — Fixar na cabeça
 
