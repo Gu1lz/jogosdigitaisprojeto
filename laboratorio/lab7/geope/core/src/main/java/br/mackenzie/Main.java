@@ -65,6 +65,9 @@ public class Main extends Game {
     @Override
     public void dispose() {
         super.dispose();
+        if (getScreen() != null) {
+            getScreen().dispose();
+        }
         batch.dispose();
         shapes.dispose();
         font.dispose();

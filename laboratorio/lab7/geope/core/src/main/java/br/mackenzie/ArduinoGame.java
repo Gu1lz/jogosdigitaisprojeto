@@ -41,13 +41,7 @@ public class ArduinoGame extends ApplicationAdapter {
         camera.update();
         shapeRenderer.setProjectionMatrix(camera.combined);
 
-        String serialData = arduinoReader.getLastData();
-        
-        if (serialData.equals("TILT:1")) {
-            player.x += playerSpeed * Gdx.graphics.getDeltaTime();
-        } else if (serialData.equals("TILT:-1")) {
-            player.x -= playerSpeed * Gdx.graphics.getDeltaTime();
-        }
+        player.x += arduinoReader.getDirecao() * playerSpeed * Gdx.graphics.getDeltaTime();
 
         if (player.x < 0) player.x = 0;
         if (player.x > 800 - player.width) player.x = 800 - player.width;
