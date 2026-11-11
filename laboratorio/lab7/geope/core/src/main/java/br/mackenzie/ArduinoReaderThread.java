@@ -7,10 +7,12 @@ import java.io.InputStream;
 public class ArduinoReaderThread extends Thread {
 
     private volatile String lastData = "TILT:0";
+    private final String portName;
     private SerialPort arduinoPort;
     private volatile boolean valido;
 
     public ArduinoReaderThread(String portName) {
+        this.portName = portName;
         try {
             this.arduinoPort = SerialPort.getCommPort(portName);
             this.valido = true;
@@ -29,14 +31,29 @@ public class ArduinoReaderThread extends Thread {
 
     @Override
     public void run() {
-        if (arduinoPort == null) {
-            return;
+        while (!isInterrupted()) {
+            readConnection();
+            if (isInterrupted()) {
+                return;
+            }
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
+    }
+
+    private void readConnection() {
         StringBuilder currentLine = new StringBuilder();
 
         try {
+            arduinoPort = SerialPort.getCommPort(portName);
             arduinoPort.setComPortParameters(9600, 8, SerialPort.ONE_STOP_BIT, SerialPort.NO_PARITY);
             arduinoPort.setFlowControl(SerialPort.FLOW_CONTROL_DISABLED);
+            // Libera as linhas ligadas a EN e GPIO0 antes de abrir o ESP32.
+            arduinoPort.clearDTR();
+            arduinoPort.clearRTS();
             if (isInterrupted()) {
                 return;
             }
@@ -46,6 +63,7 @@ public class ArduinoReaderThread extends Thread {
                 SerialPortLister.listSerialPorts();
                 return;
             }
+            valido = true;
             System.out.println("Serial aberta: " + arduinoPort.getSystemPortName()
                 + " a 9600 baud. Aguardando TILT:-1 / TILT:0 / TILT:1.");
 
@@ -73,6 +91,8 @@ public class ArduinoReaderThread extends Thread {
                             } else if (texto.equals("READY") || texto.startsWith("ERRO:")) {
                                 lastData = "TILT:0";
                                 System.out.println("ESP32: " + texto);
+                            } else if (texto.startsWith("INFO:")) {
+                                System.out.println("ESP32: " + texto);
                             } else if (texto.startsWith("TILT")) {
                                 System.err.println("Mensagem serial invalida: " + texto
                                     + ". Use TILT:-1, TILT:0 ou TILT:1.");
@@ -90,7 +110,7 @@ public class ArduinoReaderThread extends Thread {
         } finally {
             lastData = "TILT:0";
             valido = false;
-            if (arduinoPort.isOpen()) {
+            if (arduinoPort != null && arduinoPort.isOpen()) {
                 arduinoPort.closePort();
                 System.out.println("Porta serial fechada.");
             }

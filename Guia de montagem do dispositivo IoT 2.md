@@ -86,7 +86,7 @@ Só então conecte o cabo USB. O LED de energia do ESP32 deve acender, e o do m�
 2. Em `File → Preferences`, no campo **Additional boards manager URLs**, cole: `https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json`
 3. Em `Tools → Board → Boards Manager`, procure **esp32** e instale **"esp32 by Espressif Systems"**. O download é grande e pode demorar.
 4. Em `Tools → Board → ESP32 Arduino`, escolha **ESP32 Dev Module**.
-5. **Não precisa instalar biblioteca do sensor.** Os sketches deste guia conversam com o MPU-6050 direto pela biblioteca `Wire`, que já vem com o suporte ao ESP32.
+5. **Não precisa instalar biblioteca do sensor.** O diagnóstico da Etapa 5 usa `Wire`, fornecida pelo suporte ao ESP32. O sketch B v3 implementa a comunicação I2C pelos GPIOs e utiliza `Arduino.h`.
 6. **Driver da porta** (o chip da placa é o CH9102X):
    - **Windows:** com o ESP32 plugado, abra o Gerenciador de Dispositivos e veja em "Portas (COM e LPT)". Se aparecer um dispositivo desconhecido, instale o driver **CH343/CH9102** do fabricante (WCH). Em computador da faculdade, pode ser preciso pedir autorização.
    - **Linux:** rode `sudo usermod -aG dialout $USER` e faça logout e login. A porta costuma ser `/dev/ttyUSB0` ou `/dev/ttyACM0`.
@@ -182,8 +182,8 @@ void loop() {
 
 **O que esperar:**
 
-- Primeiro aparece `Achei dispositivo em 0x68` (ou `0x69`). Isso prova que fios, solda e alimentação estão certos.
-- Depois aparece `WHO_AM_I: 0x68`. Alguns módulos trazem um chip "clone" que responde `0x70`, `0x72` ou `0x98`. **Isso é normal e funciona igual**: o que importa é o sensor ter sido encontrado.
+- Primeiro aparece `Achei dispositivo em 0x68` (ou `0x69`). Isso confirma uma resposta I2C naquele endereço durante a varredura.
+- Depois aparece `WHO_AM_I: 0x68`. Alguns módulos trazem um chip "clone" que responde `0x70`, `0x72` ou `0x98`. A compatibilidade depende do chip presente no módulo e deve ser confirmada pelas leituras dos eixos.
 - Em seguida, linhas com `AX`, `AY` e `AZ`. Com o módulo parado, **um dos três valores fica perto de 16000** (o eixo que aponta para cima ou para baixo) e os outros ficam perto de zero. Ao inclinar, os valores mudam de forma suave.
 - Se aparecer `Nenhum dispositivo encontrado`, veja a lista abaixo.
 
@@ -200,54 +200,195 @@ void loop() {
 
 ## Etapa 6 — Código que envia a inclinação para o jogo
 
-Este sketch lê o eixo X, suaviza o ruído com uma **média móvel**, aplica uma **zona morta (histerese)** para não ficar oscilando e envia `TILT:-1`, `TILT:0` ou `TILT:1` pela serial a **9600 baud**.
+O sketch B v3 lê os três eixos do MPU-6050 e usa AX para o controle lateral. A comunicação I2C usa SDA 21 e SCL 22, com as linhas em dreno aberto e pull-up habilitado. Na validação desta montagem, o acesso por Wire retornava erros enquanto esse acesso por GPIO conseguiu identificar `WHO_AM_I=0x68` e ler os eixos durante trechos do teste. Também houve falhas de confirmação com GPIO, portanto essa alternativa ainda não garante comunicação estável. O jogo recebe `TILT:-1`, `TILT:0` e `TILT:1` a 9600 baud.
 
 ```cpp
-#include <Wire.h>
+#include <Arduino.h>
 
-const uint8_t MPU_ADDR = 0x68;   // se o AD0 estiver no 3V3, use 0x69
+const int SDA_PIN = 21;
+const int SCL_PIN = 22;
+const unsigned int TEMPO_SINAL_US = 100;
+const unsigned long TIMEOUT_CLOCK_US = 2000;
+const int TENTATIVAS_LEITURA = 3;
+const bool MOSTRAR_LEITURAS = true;   // mostra AX, AY e AZ uma vez por segundo
+uint8_t MPU_ADDR = 0x68;              // detectado entre 0x68 e 0x69
 
 // --- Parâmetros de calibração ---
 const int   THRESHOLD   = 3000;   // sensibilidade (ajuste)
 const int   N_MEDIA     = 5;      // tamanho da média móvel
 const int   DEADBAND    = 500;    // histerese para não oscilar
-const unsigned long INTERVALO_MS = 20;  // 50 leituras por segundo
+const unsigned long INTERVALO_MS = 50;  // ate 20 leituras por segundo
 const unsigned long REENVIO_MS = 250;  // repete o estado para sincronizar com o jogo
+const unsigned long NOVA_TENTATIVA_MS = 1000;
 
 int buf[N_MEDIA];
 int idx = 0;
 int dirAnterior = 0;
 unsigned long ultimoEnvio = 0;
 unsigned long ultimoTilt = 0;
-unsigned long ultimoAviso = 0;
+unsigned long ultimaTentativa = 0;
+unsigned long ultimaLeituraExibida = 0;
 bool sensorOk = false;
 
-// tira o sensor do modo sleep; devolve false se ele não responder
-bool acordarSensor() {
-    Wire.beginTransmission(MPU_ADDR);
-    Wire.write(0x6B);   // registrador PWR_MGMT_1
-    Wire.write(0x00);
-    return Wire.endTransmission(true) == 0;
+// I2C por GPIO. As linhas ficam em dreno aberto com pull-up habilitado.
+// Essa configuracao conseguiu ler o MPU nesta montagem, onde Wire retornou NACK.
+void liberarLinha(int pino) {
+    digitalWrite(pino, HIGH);
+    delayMicroseconds(TEMPO_SINAL_US);
 }
 
-// lê a aceleração do eixo X; devolve false se o sensor não responder
-bool lerAceleracaoX(int16_t &ax) {
-    Wire.beginTransmission(MPU_ADDR);
-    Wire.write(0x3B);   // registrador ACCEL_XOUT_H
-    if (Wire.endTransmission(false) != 0) return false;
-    if (Wire.requestFrom((int)MPU_ADDR, 2) != 2) return false;
-    uint8_t alto = Wire.read();
-    uint8_t baixo = Wire.read();
-    ax = (int16_t)((alto << 8) | baixo);
+void baixarLinha(int pino) {
+    digitalWrite(pino, LOW);
+    delayMicroseconds(TEMPO_SINAL_US);
+}
+
+bool elevarClock() {
+    liberarLinha(SCL_PIN);
+    unsigned long inicio = micros();
+    while (digitalRead(SCL_PIN) == LOW) {
+        if (micros() - inicio >= TIMEOUT_CLOCK_US) return false;
+    }
     return true;
 }
 
-// avisa no máximo uma vez por segundo, para não encher a serial
-void avisarErro() {
-    if (millis() - ultimoAviso > 1000) {
-        Serial.println("ERRO: MPU6050 nao respondeu");
-        ultimoAviso = millis();
+bool iniciarTransacao() {
+    liberarLinha(SDA_PIN);
+    if (!elevarClock() || digitalRead(SDA_PIN) == LOW) return false;
+    baixarLinha(SDA_PIN);
+    baixarLinha(SCL_PIN);
+    return true;
+}
+
+void encerrarTransacao() {
+    baixarLinha(SDA_PIN);
+    elevarClock();
+    liberarLinha(SDA_PIN);
+}
+
+bool enviarByte(uint8_t valor) {
+    for (int bit = 7; bit >= 0; bit--) {
+        if (valor & (1 << bit)) liberarLinha(SDA_PIN);
+        else baixarLinha(SDA_PIN);
+        if (!elevarClock()) return false;
+        baixarLinha(SCL_PIN);
     }
+    liberarLinha(SDA_PIN);
+    bool clockOk = elevarClock();
+    bool confirmado = clockOk && digitalRead(SDA_PIN) == LOW;
+    baixarLinha(SCL_PIN);
+    return confirmado;
+}
+
+bool receberByte(uint8_t &valor, bool confirmar) {
+    valor = 0;
+    liberarLinha(SDA_PIN);
+    for (int bit = 0; bit < 8; bit++) {
+        if (!elevarClock()) return false;
+        valor = (valor << 1) | digitalRead(SDA_PIN);
+        baixarLinha(SCL_PIN);
+    }
+    if (confirmar) baixarLinha(SDA_PIN);
+    else liberarLinha(SDA_PIN);
+    bool clockOk = elevarClock();
+    baixarLinha(SCL_PIN);
+    liberarLinha(SDA_PIN);
+    return clockOk;
+}
+
+void recuperarBarramento() {
+    pinMode(SDA_PIN, OUTPUT_OPEN_DRAIN | PULLUP);
+    pinMode(SCL_PIN, OUTPUT_OPEN_DRAIN | PULLUP);
+    liberarLinha(SDA_PIN);
+    elevarClock();
+    for (int i = 0; i < 9; i++) {
+        baixarLinha(SCL_PIN);
+        elevarClock();
+    }
+    encerrarTransacao();
+}
+
+bool escreverRegistrador(uint8_t registrador, uint8_t valor) {
+    bool ok = iniciarTransacao() && enviarByte(MPU_ADDR << 1)
+        && enviarByte(registrador) && enviarByte(valor);
+    encerrarTransacao();
+    return ok;
+}
+
+bool lerRegistradores(uint8_t registrador, uint8_t *dados, int quantidade) {
+    bool ok = iniciarTransacao() && enviarByte(MPU_ADDR << 1)
+        && enviarByte(registrador) && iniciarTransacao()
+        && enviarByte((MPU_ADDR << 1) | 1);
+    for (int i = 0; ok && i < quantidade; i++) {
+        ok = receberByte(dados[i], i < quantidade - 1);
+    }
+    encerrarTransacao();
+    return ok;
+}
+
+void registrarErro(const char *etapa) {
+    Serial.print("ERRO: MPU6050 etapa=");
+    Serial.print(etapa);
+    Serial.print(" endereco=0x");
+    Serial.println(MPU_ADDR, HEX);
+}
+
+bool lerAceleracao(int16_t &ax, int16_t &ay, int16_t &az) {
+    uint8_t dados[6];
+    for (int tentativa = 0; tentativa < TENTATIVAS_LEITURA; tentativa++) {
+        if (lerRegistradores(0x3B, dados, 6)) {
+            ax = (int16_t)((dados[0] << 8) | dados[1]);
+            ay = (int16_t)((dados[2] << 8) | dados[3]);
+            az = (int16_t)((dados[4] << 8) | dados[5]);
+            return true;
+        }
+        delay(1);
+    }
+    registrarErro("LER_ACCEL");
+    return false;
+}
+
+bool iniciarSensor() {
+    recuperarBarramento();
+    bool encontrado = false;
+    for (uint8_t endereco = 0x68; endereco <= 0x69; endereco++) {
+        bool confirmou = iniciarTransacao() && enviarByte(endereco << 1);
+        encerrarTransacao();
+        Serial.print("INFO: I2C_GPIO endereco=0x");
+        Serial.print(endereco, HEX);
+        Serial.print(" ACK=");
+        Serial.println(confirmou);
+        if (confirmou) {
+            MPU_ADDR = endereco;
+            encontrado = true;
+            break;
+        }
+    }
+    if (!encontrado) {
+        Serial.println("ERRO: I2C etapa=DETECTAR sem resposta em 0x68 e 0x69");
+        return false;
+    }
+    if (!escreverRegistrador(0x6B, 0x00)) {
+        registrarErro("ACORDAR");
+        return false;
+    }
+    delay(100);
+
+    uint8_t identidade;
+    if (lerRegistradores(0x75, &identidade, 1)) {
+        Serial.print("INFO: WHO_AM_I=0x");
+        Serial.println(identidade, HEX);
+    }
+    int16_t ax, ay, az;
+    if (!lerAceleracao(ax, ay, az)) return false;
+
+    // Descarta a media anterior ao recuperar o sensor.
+    for (int i = 0; i < N_MEDIA; i++) buf[i] = ax;
+    idx = 0;
+    dirAnterior = 0;
+    Serial.println("READY");
+    Serial.println("TILT:0");
+    ultimoTilt = millis();
+    return true;
 }
 
 // se o sensor sumir, solta o personagem (TILT:0) e avisa
@@ -257,30 +398,31 @@ void sensorFalhou() {
         dirAnterior = 0;
         Serial.println("TILT:0");
     }
-    avisarErro();
+    ultimaTentativa = millis();
 }
 
 void setup() {
     Serial.begin(9600);
-    Wire.begin(21, 22);   // SDA = 21, SCL = 22 (ESP32)
-    for (int i = 0; i < N_MEDIA; i++) buf[i] = 0;
-    sensorOk = acordarSensor();
-    Serial.println("READY");
-    Serial.println("TILT:0");
+    delay(1000);   // mesma espera usada no diagnostico que leu os eixos
+    Serial.println("INFO: HeadRush sketch B v3 SERIAL=9600 SDA=21 SCL=22 I2C=GPIO SINAL_US=100");
+    sensorOk = iniciarSensor();
+    ultimaTentativa = millis();
 }
 
 void loop() {
+    delay(1);
+    if (!sensorOk) {
+        if (millis() - ultimaTentativa < NOVA_TENTATIVA_MS) return;
+        sensorOk = iniciarSensor();
+        ultimaTentativa = millis();
+        return;
+    }
+
     if (millis() - ultimoEnvio < INTERVALO_MS) return;
     ultimoEnvio = millis();
 
-    // se o sensor falhou, tenta acordar de novo (sem travar o programa)
-    if (!sensorOk) {
-        sensorOk = acordarSensor();
-        if (!sensorOk) { avisarErro(); return; }
-    }
-
-    int16_t ax;
-    if (!lerAceleracaoX(ax)) {
+    int16_t ax, ay, az;
+    if (!lerAceleracao(ax, ay, az)) {
         sensorFalhou();
         return;
     }
@@ -305,19 +447,48 @@ void loop() {
         dirAnterior = dir;
         ultimoTilt = millis();
     }
+
+    if (MOSTRAR_LEITURAS && millis() - ultimaLeituraExibida >= 1000) {
+        Serial.print("INFO: AX=");
+        Serial.print(ax);
+        Serial.print(" AY=");
+        Serial.print(ay);
+        Serial.print(" AZ=");
+        Serial.print(az);
+        Serial.print(" MEDIA_X=");
+        Serial.print(media);
+        Serial.print(" TILT=");
+        Serial.println(dir);
+        ultimaLeituraExibida = millis();
+    }
 }
 ```
 
-**Como entender os números:**
+A temporização por sinal é de 100 microssegundos, com intervalo de leitura de 50 ms. O controle usa uma média de cinco amostras, limiar de 3000 e histerese de 500. AX acima de 3500 produz `TILT:1`, abaixo de -3500 produz `TILT:-1` e dentro da faixa de -3000 a 3000 retorna ao centro. O estado é enviado a cada mudança e repetido a cada 250 ms.
 
-- Na escala padrão do sensor, **1 g = 16384**. Então um `THRESHOLD` de 3000 equivale a uma inclinação de uns **10 graus**.
-- O sistema só passa para `TILT:1` ou `TILT:-1` quando o valor ultrapassa 3500 (uns 12 graus) e só volta ao centro quando cai abaixo de 3000.
-- O ESP32 envia `TILT:0` ao iniciar, transmite imediatamente cada mudança e repete o estado atual a cada 250 ms. Isso permite sincronizar o jogo mesmo quando ele abre a porta depois de uma mudança de inclinação.
-- Além do `TILT`, o ESP32 envia `READY` ao ligar e `ERRO: ...` se o sensor falhar. O jogo mostra essas mensagens no console e retorna a direção para centro (0) ao recebê-las.
+`READY` e o primeiro `TILT:0` são enviados depois de uma leitura inicial completa dos eixos. As leituras têm até três tentativas. Em caso de falha persistente, o sketch envia um erro, neutraliza a direção e tenta inicializar novamente após um segundo, recuperando o barramento com pulsos de clock e uma condição STOP. A busca contempla os endereços `0x68` e `0x69`.
 
-**Esta versão é mais robusta que a anterior:** ela conversa com o sensor direto pela biblioteca `Wire`, sem verificar o código de identidade (módulos com chip "clone" eram rejeitados por essa verificação, mesmo funcionando). Também **não trava** se o sensor falhar: ela avisa com `ERRO: MPU6050 nao respondeu` a cada segundo, solta o personagem (`TILT:0`) e volta a funcionar sozinha quando o contato voltar.
+### Diagnóstico do sketch B v3
+
+- `INFO: HeadRush sketch B v3 ... I2C=GPIO` identifica a versão gravada.
+- `INFO: I2C_GPIO endereco=0x68 ACK=1` confirma resposta naquele endereço. `ACK=0` indica ausência de confirmação naquela tentativa.
+- `INFO: WHO_AM_I=0x68` mostra a identidade lida do módulo. A leitura dos eixos também precisa funcionar para emitir `READY`.
+- `ERRO: I2C etapa=DETECTAR` indica que nenhum dos dois endereços respondeu.
+- `ERRO: MPU6050 etapa=ACORDAR` identifica uma falha na escrita do registrador de energia.
+- `ERRO: MPU6050 etapa=LER_ACCEL` indica que as tentativas de leitura dos eixos falharam.
+- `INFO: AX=... AY=... AZ=... MEDIA_X=... TILT=...` mostra os valores usados para decidir o movimento. A opção `MOSTRAR_LEITURAS` controla essa exibição periódica.
+
+Abra o arquivo atualizado `arduino.sketches/sketch_nov9b/sketch_nov9b.ino` na IDE e selecione ESP32 Dev Module e a porta do dispositivo. Se a conexão para upload precisar de ajuda, segure BOOT enquanto aparece `Connecting` e solte quando a gravação começar. Depois do upload, deixe BOOT solto e pressione somente EN para executar o programa, caso a reinicialização automática precise ser repetida. No Monitor Serial a 9600 baud, confira o identificador `HeadRush sketch B v3`. Os símbolos breves do boot podem anteceder esse identificador porque o boot do ESP32 transmite a 115200 baud.
+
+Na validação com a placa física, foram recebidos os três comandos pelo jogo. Também houve períodos de falha I2C e recuperação. A comunicação ainda precisa ser conferida durante o manuseio do conjunto.
+
+O sketch executa e transmite independentemente do jogo. Feche o Monitor Serial e o Plotter Serial antes de iniciar o jogo para liberar a porta. Ao executar pela JVM do jogo, as linhas `INFO` e `ERRO` também aparecem no console.
 
 ## Etapa 7 — Calibrar
+
+O controle depende da inclinação do eixo X. Na tela ArduinoGame, o módulo respondeu para ambos os lados quando foi segurado na orientação indicada pelo teste físico. Preserve essa orientação ao fixá-lo no acessório. Com a cabeça centralizada, AX deve ficar dentro da zona central, próximo de zero. Inclinar para cada lado deve produzir sinais opostos em AX. A posição do módulo à esquerda ou à direita da mesa, por si só, não define o comando.
+
+Manter `TILT:1` equivale a manter a seta direita pressionada, e manter `TILT:-1` equivale à seta esquerda. O personagem continua se deslocando até receber `TILT:0` ou alcançar a borda. No jogo completo, o movimento é aplicado durante a partida ativa. A tecla R reinicia a partida depois de uma colisão.
 
 Abra o Monitor Serial (9600 baud). Deve aparecer `READY` e, ao inclinar a cabeça, `TILT:-1` e `TILT:1`.
 
@@ -386,7 +557,7 @@ Rode o programa e incline o módulo. Deve aparecer `READY` (o ESP32 reinicia qua
 3. Abra um terminal em `laboratorio/lab7/geope` e execute o comando com a porta encontrada.
 
 ```bash
-./gradlew lwjgl3:run -Darduino.port=/dev/ttyUSB0
+./gradlew lwjgl3:run -Darduino.port=/dev/ttyACM0
 ```
 
 No Windows, use o wrapper correspondente e a porta do Gerenciador de Dispositivos.
@@ -397,7 +568,9 @@ gradlew.bat lwjgl3:run -Darduino.port=COM3
 
 O `build.gradle` de `lwjgl3` repassa `arduino.port` à JVM que executa o jogo. Sem essa opção, o padrão é `/dev/ttyUSB0`. Ao executar diretamente pela IDE, configure `-Darduino.port=COM3` nas opções da JVM. Para o JAR, coloque a propriedade antes de `-jar`.
 
-Ao iniciar uma partida, confira no console `Serial aberta` com a porta selecionada e `9600 baud`. Ao inclinar o sensor, confira `Serial recebida` com `TILT:-1`, `TILT:0` ou `TILT:1`. A direção recebida permanece ativa até a próxima mensagem. O leitor é encerrado ao voltar ao menu ou fechar o jogo, liberando a porta para a próxima partida.
+Ao iniciar uma partida, confira no console `Serial aberta` com a porta selecionada e `9600 baud`. Ao inclinar o sensor, confira `Serial recebida` com `TILT:-1`, `TILT:0` ou `TILT:1`. A direção recebida permanece ativa até a próxima mensagem. O leitor libera DTR e RTS antes de abrir a porta, para manter as linhas de controle de EN e GPIO0 liberadas. Ele é encerrado ao voltar ao menu ou fechar o jogo, liberando a porta para a próxima partida.
+
+Se o USB for desconectado ou a porta estiver indisponível ao iniciar a partida, o leitor neutraliza o comando e tenta abrir novamente a porta configurada a cada segundo. Quando o ESP32 reaparece nessa porta, a leitura é retomada automaticamente. Se o sistema atribuir outro nome à porta, execute novamente o jogo com o novo valor de `arduino.port`. A tecla R reinicia apenas a partida.
 
 Se a porta estiver incorreta ou ocupada, o console informa o problema e lista as portas disponíveis. Se aparecer `ERRO` enviado pelo ESP32, verifique a leitura do sensor pelo sketch. Se a porta abrir e nenhuma mudança de `TILT` aparecer, confira o sketch gravado, o eixo X e os limiares da Etapa 7.
 
