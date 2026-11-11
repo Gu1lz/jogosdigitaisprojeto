@@ -1,0 +1,29 @@
+package br.mackenzie;
+
+import com.badlogic.gdx.graphics.Color;
+
+public final class Tema {
+
+    private Tema() {}
+
+    public static final float LARGURA_MUNDO = 9f;
+    public static final float ALTURA_MUNDO  = 16f;
+
+    public static final String TITULO_JOGO = "HEAD RUSH";
+    public static final String NOME_PREFS  = "headrush";
+
+    public static final Color VOID          = new Color(0.02f, 0.01f, 0.06f, 1f);
+    public static final Color SKY_TOP       = new Color(0.05f, 0.02f, 0.14f, 1f);
+    public static final Color SKY_BOTTOM    = new Color(0.22f, 0.04f, 0.28f, 1f);
+
+    public static final Color CYAN          = new Color(0.10f, 0.95f, 1.00f, 1f);
+    public static final Color MAGENTA       = new Color(1.00f, 0.15f, 0.70f, 1f);
+    public static final Color YELLOW        = new Color(1.00f, 0.90f, 0.20f, 1f);
+    public static final Color PURPLE        = new Color(0.55f, 0.25f, 0.95f, 1f);
+    public static final Color RED           = new Color(1.00f, 0.25f, 0.30f, 1f);
+    public static final Color WHITE         = new Color(1f, 1f, 1f, 1f);
+
+    public static final Color BUILDING_FAR  = new Color(0.07f, 0.04f, 0.16f, 1f);
+    public static final Color BUILDING_NEAR = new Color(0.04f, 0.02f, 0.10f, 1f);
+    public static final Color BLOCK_BODY    = new Color(0.10f, 0.03f, 0.16f, 1f);
+}

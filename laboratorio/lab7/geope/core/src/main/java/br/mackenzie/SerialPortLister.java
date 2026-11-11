@@ -7,9 +7,6 @@ public class SerialPortLister {
         listSerialPorts();
     }
 
-    /**
-     * Lista todas as portas seriais disponíveis no sistema.
-     */
     public static void listSerialPorts() {
         SerialPort[] ports = SerialPort.getCommPorts();
         if (ports.length == 0) {

@@ -1,6 +1,6 @@
 # jogosdigitaisprojeto — Projeto IoT
 
-## Jogo sério para reabilitação com libGDX
+## Jogo HeadRush libGDX
 
 ### 1. Visão geral
 
@@ -65,4 +65,4 @@ A adequação ao público-alvo e os possíveis benefícios para a reabilitação
 
 ### 10. Prazo de entrega
 
-**Data limite: 1º de novembro de 2026.**
+**Data limite: 11 de novembro de 2026.**

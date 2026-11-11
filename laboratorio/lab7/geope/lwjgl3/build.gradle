@@ -43,6 +43,11 @@ def os = System.properties['os.name'].toLowerCase()
 
 run {
   workingDir = rootProject.file('assets').path
+  // A tarefa run inicia outra JVM, que precisa receber a porta explicitamente.
+  def portaArduino = System.getProperty('arduino.port')
+  if (portaArduino != null) {
+    systemProperty 'arduino.port', portaArduino
+  }
 // You can uncomment the next line if your IDE claims a build failure even when the app closed properly.
   //setIgnoreExitValue(true)
 
