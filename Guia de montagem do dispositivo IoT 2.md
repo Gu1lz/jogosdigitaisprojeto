@@ -490,6 +490,8 @@ O controle depende da inclinação do eixo X. Na tela ArduinoGame, o módulo res
 
 Manter `TILT:1` equivale a manter a seta direita pressionada, e manter `TILT:-1` equivale à seta esquerda. O personagem continua se deslocando até receber `TILT:0` ou alcançar a borda. No jogo completo, o movimento é aplicado durante a partida ativa. A tecla R reinicia a partida depois de uma colisão.
 
+O teste `ArduinoGame` e o jogo completo usam `ArduinoReaderThread.getDirecao()` para interpretar o sensor. Durante a partida ativa, o controle por sensor aplica a velocidade lateral imediatamente, como no quadrado verde. Ao receber `TILT:0` ou um erro do sensor, a contribuição do sensor para o movimento para na atualização seguinte. O teclado e o toque continuam disponíveis. O teste não tem obstáculos, pausa ou morte, enquanto o jogo completo respeita esses estados.
+
 Abra o Monitor Serial (9600 baud). Deve aparecer `READY` e, ao inclinar a cabeça, `TILT:-1` e `TILT:1`.
 
 | Sintoma | O que fazer |

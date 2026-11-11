@@ -15,7 +15,7 @@ public class ArduinoReaderThread extends Thread {
         this.portName = portName;
         try {
             this.arduinoPort = SerialPort.getCommPort(portName);
-            this.valido = true;
+            this.valido = false;
         } catch (Exception e) {
             System.err.println("Aviso: Porta serial invalida: " + portName
                 + ". Configure -Darduino.port com a porta do ESP32.");
@@ -119,6 +119,13 @@ public class ArduinoReaderThread extends Thread {
 
     public String getLastData() {
         return lastData;
+    }
+
+    public int getDirecao() {
+        String dado = lastData;
+        if (dado.equals("TILT:1")) return 1;
+        if (dado.equals("TILT:-1")) return -1;
+        return 0;
     }
 
     public void stopReading() {

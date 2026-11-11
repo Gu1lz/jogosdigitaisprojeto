@@ -46,6 +46,7 @@ public class TelaJogo extends ScreenAdapter {
     private float velocidadeRolagem;
     private float xJogador;
     private float velocidadeX;
+    private boolean controleArduinoAtivo;
     private float tempo;
     private float tempoIntroducao;
     private float tempoDica;
@@ -81,6 +82,7 @@ public class TelaJogo extends ScreenAdapter {
         velocidadeRolagem = VELOCIDADE_BASE;
         xJogador = LARGURA / 2f;
         velocidadeX = 0f;
+        controleArduinoAtivo = false;
         tempoIntroducao = 2f;
         fase = 1;
 
@@ -274,15 +276,9 @@ public class TelaJogo extends ScreenAdapter {
             }
         }
         
-        // Arduino (Acelerômetro)
-        if (leitorArduino != null) {
-            String dado = leitorArduino.getLastData();
-            if (dado.equals("TILT:1")) {
-                direcao += 1f;
-            } else if (dado.equals("TILT:-1")) {
-                direcao -= 1f;
-            }
-        }
+        // Mesma direcao serial usada no teste do quadrado verde.
+        int direcaoArduino = leitorArduino.getDirecao();
+        direcao += direcaoArduino;
 
         if (direcao < -1f) direcao = -1f;
         if (direcao > 1f) direcao = 1f;
@@ -290,7 +286,13 @@ public class TelaJogo extends ScreenAdapter {
         float fator = 16f * delta;
         if (fator > 1f) fator = 1f;
         
-        velocidadeX += (direcao * VELOCIDADE_LATERAL - velocidadeX) * fator;
+        if (direcaoArduino != 0 || controleArduinoAtivo) {
+            // Resposta direta do teste, inclusive ao voltar ao centro ou perder o sensor.
+            velocidadeX = direcao * VELOCIDADE_LATERAL;
+        } else {
+            velocidadeX += (direcao * VELOCIDADE_LATERAL - velocidadeX) * fator;
+        }
+        controleArduinoAtivo = direcaoArduino != 0;
         xJogador += velocidadeX * delta;
 
         float minimoX = LIMITE + RAIO_COLISAO;
