@@ -22,7 +22,7 @@ A sensibilidade dos controles e a dificuldade deverão considerar as necessidade
 
 - **Linguagem:** Java.
 - **Framework:** libGDX.
-- **IoT:** sensor de movimento com acelerômetro, a definir.
+- **IoT:** esp32 + mpu6050.
 - **Controle:** captura e interpretação dos movimentos da cabeça.
 - **Versionamento:** Git e GitHub.
 
@@ -36,7 +36,7 @@ Inicialmente, a mecânica poderá ser desenvolvida com comandos simulados. Na ve
 
 ### 6. Fases e dificuldade progressiva
 
-O jogo contará com **3 fases**, com dificuldade progressiva.
+O jogo contará com **5 fases**, com dificuldade progressiva.
 
 A dificuldade poderá variar de acordo com os movimentos registrados pelo sensor e o desempenho do jogador. A adaptação deverá considerar a consistência dos comandos e a taxa de acertos, evitando que movimentos involuntários aumentem automaticamente o desafio.
 
@@ -49,20 +49,3 @@ A dificuldade poderá variar de acordo com os movimentos registrados pelo sensor
 - Registro de métricas de desempenho e pontuação.
 - Ajustes de sensibilidade para tornar os controles mais acessíveis.
 
-### 8. Validação
-
-A validação será realizada por meio de testes de funcionamento do jogo, integração com o sensor, precisão dos comandos e progressão da dificuldade.
-
-A adequação ao público-alvo e os possíveis benefícios para a reabilitação deverão ser avaliados posteriormente. O protótipo, por si só, não comprova eficácia clínica.
-
-### 9. Entregáveis
-
-- Código-fonte completo do projeto.
-- Executável ou APK do jogo.
-- Short paper de até seis páginas, contendo a descrição do problema, a justificativa, as funcionalidades implementadas e capturas de tela do jogo.
-- Commits semanais no GitHub.
-- Acompanhamento do desenvolvimento por meio de um quadro Kanban.
-
-### 10. Prazo de entrega
-
-**Data limite: 11 de novembro de 2026.**
