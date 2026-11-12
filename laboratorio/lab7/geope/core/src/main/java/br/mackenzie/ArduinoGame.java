@@ -28,7 +28,7 @@ public class ArduinoGame extends ApplicationAdapter {
         player.width = 30;
         player.height = 30;
 
-        String portName = System.getProperty("arduino.port", "/dev/ttyUSB0");
+        String portName = ArduinoReaderThread.getPortaConfigurada();
         arduinoReader = new ArduinoReaderThread(portName);
         arduinoReader.start();
     }

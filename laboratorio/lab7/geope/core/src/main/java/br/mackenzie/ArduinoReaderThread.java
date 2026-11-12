@@ -10,6 +10,21 @@ public class ArduinoReaderThread extends Thread {
     private final String portName;
     private SerialPort arduinoPort;
     private volatile boolean valido;
+    private volatile boolean dispositivoDetectado;
+    private volatile boolean sensorPronto;
+    private volatile String status = "ESP32 aguardando conexao";
+
+    public static String getPortaConfigurada() {
+        return System.getProperty("arduino.port", "/dev/ttyACM0");
+    }
+
+    public boolean isAguardandoSensor() {
+        return dispositivoDetectado && !sensorPronto;
+    }
+
+    public String getStatus() {
+        return status;
+    }
 
     public ArduinoReaderThread(String portName) {
         this.portName = portName;
@@ -64,6 +79,8 @@ public class ArduinoReaderThread extends Thread {
                 return;
             }
             valido = true;
+            dispositivoDetectado = true;
+            status = "ESP32 conectado - aguardando sensor";
             System.out.println("Serial aberta: " + arduinoPort.getSystemPortName()
                 + " a 9600 baud. Aguardando TILT:-1 / TILT:0 / TILT:1.");
 
@@ -88,8 +105,18 @@ public class ArduinoReaderThread extends Thread {
                                     System.out.println("Serial recebida: " + texto);
                                 }
                                 lastData = texto;
+                                sensorPronto = true;
+                                if (texto.equals("TILT:-1")) {
+                                    status = "SENSOR ESQUERDA";
+                                } else if (texto.equals("TILT:1")) {
+                                    status = "SENSOR DIREITA";
+                                } else {
+                                    status = "SENSOR CENTRO";
+                                }
                             } else if (texto.equals("READY") || texto.startsWith("ERRO:")) {
                                 lastData = "TILT:0";
+                                sensorPronto = false;
+                                status = texto.equals("READY") ? "Sensor iniciando" : "Sensor sem leitura";
                                 System.out.println("ESP32: " + texto);
                             } else if (texto.startsWith("INFO:")) {
                                 System.out.println("ESP32: " + texto);
@@ -109,7 +136,9 @@ public class ArduinoReaderThread extends Thread {
             System.err.println("Erro na leitura serial: " + e.getMessage());
         } finally {
             lastData = "TILT:0";
+            sensorPronto = false;
             valido = false;
+            status = "ESP32 aguardando conexao";
             if (arduinoPort != null && arduinoPort.isOpen()) {
                 arduinoPort.closePort();
                 System.out.println("Porta serial fechada.");

@@ -17,6 +17,7 @@ public class Main extends Game {
     private float fontBaseLineHeight;
     private Assets assets;
     private Preferences prefs;
+    private ArduinoReaderThread leitorArduino;
 
     @Override
     public void create() {
@@ -31,7 +32,13 @@ public class Main extends Game {
             Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
         fontBaseLineHeight = font.getLineHeight();
 
+        leitorArduino = new ArduinoReaderThread(ArduinoReaderThread.getPortaConfigurada());
+        leitorArduino.start();
         setScreen(new TelaMenu(this));
+    }
+
+    public ArduinoReaderThread obterLeitorArduino() {
+        return leitorArduino;
     }
 
     public SpriteBatch obterLote() {
@@ -67,6 +74,14 @@ public class Main extends Game {
         super.dispose();
         if (getScreen() != null) {
             getScreen().dispose();
+        }
+        if (leitorArduino != null) {
+            leitorArduino.stopReading();
+            try {
+                leitorArduino.join();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
         batch.dispose();
         shapes.dispose();
