@@ -568,11 +568,13 @@ No Windows, use o wrapper correspondente e a porta do Gerenciador de Dispositivo
 gradlew.bat lwjgl3:run -Darduino.port=COM3
 ```
 
-O `build.gradle` de `lwjgl3` repassa `arduino.port` à JVM que executa o jogo. Sem essa opção, o padrão é `/dev/ttyUSB0`. Ao executar diretamente pela IDE, configure `-Darduino.port=COM3` nas opções da JVM. Para o JAR, coloque a propriedade antes de `-jar`.
+O `build.gradle` de `lwjgl3` repassa `arduino.port` à JVM que executa o jogo. Sem essa opção, o padrão é `/dev/ttyACM0`, como no teste do quadrado verde. Ao executar diretamente pela IDE, configure `-Darduino.port=COM3` nas opções da JVM. Para o JAR, coloque a propriedade antes de `-jar`.
 
-Ao iniciar uma partida, confira no console `Serial aberta` com a porta selecionada e `9600 baud`. Ao inclinar o sensor, confira `Serial recebida` com `TILT:-1`, `TILT:0` ou `TILT:1`. A direção recebida permanece ativa até a próxima mensagem. O leitor libera DTR e RTS antes de abrir a porta, para manter as linhas de controle de EN e GPIO0 liberadas. Ele é encerrado ao voltar ao menu ou fechar o jogo, liberando a porta para a próxima partida.
+Ao abrir o jogo, confira no console `Serial aberta` com a porta selecionada e `9600 baud`. Ao inclinar o sensor, confira `Serial recebida` com `TILT:-1`, `TILT:0` ou `TILT:1`. A direção recebida permanece ativa até a próxima mensagem. O leitor libera DTR e RTS antes de abrir a porta, para manter as linhas de controle de EN e GPIO0 liberadas. A aplicação mantém um único leitor desde o menu inicial até o fechamento da janela, incluindo reinícios e trocas de tela. Feche o jogo para liberar a porta antes de abrir o Monitor Serial.
 
 Se o USB for desconectado ou a porta estiver indisponível ao iniciar a partida, o leitor neutraliza o comando e tenta abrir novamente a porta configurada a cada segundo. Quando o ESP32 reaparece nessa porta, a leitura é retomada automaticamente. Se o sistema atribuir outro nome à porta, execute novamente o jogo com o novo valor de `arduino.port`. A tecla R reinicia apenas a partida.
+
+Depois que a conexão com o dispositivo for detectada, a pista aguarda um `TILT` válido. Um erro do sensor ou uma desconexão suspende o avanço até a leitura ser recuperada. A tela mostra `AGUARDANDO SENSOR` e informa a direção ou o estado da conexão no rodapé. Uma inclinação válida tem prioridade sobre teclas e toques opostos. O toque usado para abrir a partida só passa a controlar o personagem depois de ser solto e pressionado novamente. Sem dispositivo detectado, a partida pode ser utilizada com os controles manuais.
 
 Se a porta estiver incorreta ou ocupada, o console informa o problema e lista as portas disponíveis. Se aparecer `ERRO` enviado pelo ESP32, verifique a leitura do sensor pelo sketch. Se a porta abrir e nenhuma mudança de `TILT` aparecer, confira o sketch gravado, o eixo X e os limiares da Etapa 7.
 

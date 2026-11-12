@@ -47,6 +47,7 @@ public class TelaJogo extends ScreenAdapter {
     private float xJogador;
     private float velocidadeX;
     private boolean controleArduinoAtivo;
+    private boolean aguardarSoltarToque;
     private float tempo;
     private float tempoIntroducao;
     private float tempoDica;
@@ -61,10 +62,7 @@ public class TelaJogo extends ScreenAdapter {
         this.estado = new EstadoJogo(jogo);
         this.painel = new PainelJogo(jogo, chefe, assets);
 
-        // INICIA O ARDUINO (Padrão Linux /dev/ttyUSB0 ou Windows COM3)
-        String porta = System.getProperty("arduino.port", "/dev/ttyUSB0");
-        leitorArduino = new ArduinoReaderThread(porta);
-        leitorArduino.start();
+        leitorArduino = jogo.obterLeitorArduino();
 
         iniciarNovaPartida();
     }
@@ -83,6 +81,7 @@ public class TelaJogo extends ScreenAdapter {
         xJogador = LARGURA / 2f;
         velocidadeX = 0f;
         controleArduinoAtivo = false;
+        aguardarSoltarToque = Gdx.input.isTouched();
         tempoIntroducao = 2f;
         fase = 1;
 
@@ -119,12 +118,16 @@ public class TelaJogo extends ScreenAdapter {
             return;
         }
 
+        boolean aguardandoSensor = leitorArduino.isAguardandoSensor();
         estado.atualizar(delta);
 
         if (!estado.estaPausado()) {
             tempo += delta;
-            if (estado.estaExecutando()) {
+            if (estado.estaExecutando() && !aguardandoSensor) {
                 atualizar(delta);
+            } else if (aguardandoSensor) {
+                velocidadeX = 0f;
+                controleArduinoAtivo = false;
             }
             particulas.atualizar(delta);
         }
@@ -167,7 +170,10 @@ public class TelaJogo extends ScreenAdapter {
         formas.end();
 
         lote.begin();
-        painel.desenharHud(estado, tempo, tempoIntroducao, tempoDica, fase);
+        painel.desenharHud(estado, tempo, aguardandoSensor ? 0f : tempoIntroducao,
+            aguardandoSensor ? 0f : tempoDica, fase);
+        painel.desenharControleArduino(leitorArduino.getStatus(),
+            aguardandoSensor && estado.estaExecutando());
         lote.end();
     }
 
@@ -176,24 +182,10 @@ public class TelaJogo extends ScreenAdapter {
         viewport.update(largura, altura, true);
     }
     
-    @Override
-    public void hide() {
-        dispose();
-    }
-
-    @Override
-    public void dispose() {
-        if (leitorArduino != null) {
-            leitorArduino.stopReading();
-            try {
-                leitorArduino.join();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }
-    }
-
     private boolean tratarEntrada() {
+        if (!Gdx.input.isTouched()) {
+            aguardarSoltarToque = false;
+        }
         if (Gdx.input.isKeyJustPressed(Keys.ESCAPE) || Gdx.input.isKeyJustPressed(Keys.P)) {
             if (estado.estaExecutando()) {
                 estado.pausar();
@@ -202,7 +194,7 @@ public class TelaJogo extends ScreenAdapter {
             }
         }
 
-        if (estado.estaExecutando() && Gdx.input.justTouched()) {
+        if (estado.estaExecutando() && !aguardarSoltarToque && Gdx.input.justTouched()) {
             viewport.unproject(toque.set(Gdx.input.getX(), Gdx.input.getY()));
             if (PainelJogo.dentroZonaPausa(toque.x, toque.y)) {
                 estado.pausar();
@@ -265,7 +257,7 @@ public class TelaJogo extends ScreenAdapter {
         }
         
         // Toque na tela
-        if (Gdx.input.isTouched()) {
+        if (!aguardarSoltarToque && Gdx.input.isTouched()) {
             viewport.unproject(toque.set(Gdx.input.getX(), Gdx.input.getY()));
             if (!PainelJogo.dentroZonaPausa(toque.x, toque.y)) {
                 if (toque.x < LARGURA / 2f) {
@@ -278,7 +270,9 @@ public class TelaJogo extends ScreenAdapter {
         
         // Mesma direcao serial usada no teste do quadrado verde.
         int direcaoArduino = leitorArduino.getDirecao();
-        direcao += direcaoArduino;
+        if (direcaoArduino != 0) {
+            direcao = direcaoArduino;
+        }
 
         if (direcao < -1f) direcao = -1f;
         if (direcao > 1f) direcao = 1f;
@@ -288,7 +282,7 @@ public class TelaJogo extends ScreenAdapter {
         
         if (direcaoArduino != 0 || controleArduinoAtivo) {
             // Resposta direta do teste, inclusive ao voltar ao centro ou perder o sensor.
-            velocidadeX = direcao * VELOCIDADE_LATERAL;
+            velocidadeX = direcaoArduino * VELOCIDADE_LATERAL;
         } else {
             velocidadeX += (direcao * VELOCIDADE_LATERAL - velocidadeX) * fator;
         }
