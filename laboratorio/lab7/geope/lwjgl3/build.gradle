@@ -54,6 +54,19 @@ run {
   if (os.contains('mac')) jvmArgs += "-XstartOnFirstThread"
 }
 
+tasks.register('verificarIntegracaoArduino', JavaExec) {
+  dependsOn testClasses
+  classpath = sourceSets.test.runtimeClasspath
+  mainClass = 'br.mackenzie.ArduinoIntegrationCheck'
+  workingDir = rootProject.file('assets')
+  systemProperty 'arduino.port', System.getProperty('arduino.port', '/dev/ttyACM0')
+  def pastaCapturas = System.getProperty('arduino.check.output')
+  if (pastaCapturas != null) {
+    systemProperty 'arduino.check.output', pastaCapturas
+  }
+  if (os.contains('mac')) jvmArgs '-XstartOnFirstThread'
+}
+
 jar {
 // sets the name of the .jar file this produces to the name of the game or app, with the version after.
   archiveFileName.set("${appName}-${projectVersion}.jar")

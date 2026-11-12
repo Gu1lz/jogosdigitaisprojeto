@@ -9,3 +9,6 @@ Tente resolver o problema do personagem do jogo nao se mover junto com o acelero
 - Não altere .github/workflows.
 - Rode `./gradlew build` antes de dizer que terminou.
 - Explique em poucas linhas o que mudou em cada arquivo.
+
+# Retomada
+O contexto técnico, os comandos de execução e as verificações pendentes estão em `documentacao/RETOMAR_PROJETO.md`.

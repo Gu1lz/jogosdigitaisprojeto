@@ -145,6 +145,15 @@ public final class PainelJogo {
         }
     }
 
+    public void desenharControleArduino(String status, boolean aguardandoSensor) {
+        centralizar(status, 0.27f, Tema.CYAN, 0.9f, 0.55f);
+        if (aguardandoSensor) {
+            centralizar("AGUARDANDO SENSOR", 0.55f, Tema.YELLOW, 1f, 8.8f);
+            centralizar("A partida continua ao receber uma leitura", 0.27f,
+                Tema.WHITE, 0.9f, 8.1f);
+        }
+    }
+
     private void desenharExecutando(EstadoJogo gs, float tempoIntroducao, float tempoDica) {
         if (tempoIntroducao > 0f) {
             float alpha = tempoIntroducao;
